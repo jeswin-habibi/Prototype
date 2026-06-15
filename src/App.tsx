@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { isSupabaseConfigured } from './lib/supabase'
+import { NavGuardProvider, useNavGuard } from './lib/navGuard'
 import { Banner } from './components/ui'
 import Dashboard from './pages/Dashboard'
 import Receipt from './pages/Receipt'
@@ -17,9 +18,16 @@ const NAV = [
 ]
 
 function NavItem({ to, label, icon }: { to: string; label: string; icon: string }) {
+  const { guard } = useNavGuard()
   return (
     <NavLink
       to={to}
+      onClick={(e) => {
+        if (guard.active) {
+          e.preventDefault()
+          window.alert(guard.message)
+        }
+      }}
       className={({ isActive }) =>
         `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition ${
           isActive ? 'bg-brand text-white' : 'text-slate-600 hover:bg-slate-100'
@@ -33,6 +41,14 @@ function NavItem({ to, label, icon }: { to: string; label: string; icon: string 
 }
 
 export default function App() {
+  return (
+    <NavGuardProvider>
+      <AppShell />
+    </NavGuardProvider>
+  )
+}
+
+function AppShell() {
   return (
     <div className="min-h-screen md:flex">
       {/* Sidebar (desktop) / top bar (mobile) */}

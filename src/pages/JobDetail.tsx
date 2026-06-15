@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/useData'
+import { useBlockNavigation } from '../lib/navGuard'
 import { calculateCost, hoursBetween, type CostResult } from '../lib/cost'
 import { childBatchId, childDescription, childItemCode } from '../lib/codes'
 import { toGrams, formatWeight } from '../lib/units'
@@ -80,6 +81,15 @@ export default function JobDetail() {
     })
   }, [data])
 
+  // Lock navigation once processing has started until child SKUs are generated
+  // (or the run is cancelled). The user must commit or cancel before leaving.
+  const navigate = useNavigate()
+  const locked = !!(data && data.job.start_at && data.childCount === 0)
+  useBlockNavigation(
+    locked,
+    'Finish this job before leaving: complete processing and click “Generate Child SKUs”, or click “Cancel Process” to discard this run.',
+  )
+
   if (loading) return <Spinner />
   if (error) return <Banner tone="error">{error}</Banner>
   if (!data || !data.job.parent) return <Banner tone="error">Job not found.</Banner>
@@ -120,6 +130,21 @@ export default function JobDetail() {
       await supabase.from('repack_jobs').update({ status: 'Completed', complete_at: new Date().toISOString() }).eq('id', id)
     })
 
+  async function cancelProcess() {
+    if (
+      !confirm(
+        'Cancel this processing run?\n\nThe job returns to planning and the entered actuals and wastage for this run are cleared. The planned pack-size mix is kept.',
+      )
+    )
+      return
+    await run(async () => {
+      await supabase.from('repack_jobs').update({ status: 'Created', start_at: null, complete_at: null, shift: null }).eq('id', id)
+      await supabase.from('job_pack_sizes').update({ actual_packs: null, actual_output_g: null }).eq('job_id', id)
+      await supabase.from('job_wastage').delete().eq('job_id', id)
+    })
+    navigate('/jobs')
+  }
+
   const addWastage = (reason: string, grams: number) =>
     run(async () => { await supabase.from('job_wastage').insert({ job_id: id, reason, grams }) })
   const removeWastage = (w: JobWastage) => run(async () => { await supabase.from('job_wastage').delete().eq('id', w.id) })
@@ -156,8 +181,24 @@ export default function JobDetail() {
       <PageHeader
         title={`Job — ${parent.item_code}`}
         subtitle={`Batch ${parent.batch_id} • ${job.machine_code} • ${job.operator_code}`}
-        actions={<StatusBadge status={status} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <StatusBadge status={status} />
+            {locked && (
+              <button className="btn-danger" onClick={cancelProcess} disabled={busy}>
+                Cancel Process
+              </button>
+            )}
+          </div>
+        }
       />
+
+      {locked && (
+        <Banner tone="warn">
+          <strong>This job is in progress.</strong> Finish it by completing processing and generating
+          child SKUs, or click <strong>Cancel Process</strong>. You can’t navigate away until then.
+        </Banner>
+      )}
 
       {/* Parent / timing summary */}
       <Section title="Parent & Processing">

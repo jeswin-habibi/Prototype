@@ -49,7 +49,7 @@ export default function Dashboard() {
       {/* KPI strip */}
       <div className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Parents received" value={num(m.parentCount)} sub={`${num(Math.round(m.parentWeightG / 1000))} kg`} />
-        <Stat label="Jobs completed" value={num(m.completedCount)} sub={`${num(m.jobsTotal)} total`} />
+        <Stat label="Jobs finalized" value={num(m.completedCount)} sub={`${num(m.jobsTotal)} total jobs`} />
         <Stat label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
         <Stat label="Avg wastage" value={pct(m.avgWastage)} tone={m.avgWastage <= 5 ? 'good' : 'warn'} />
         <Stat label="Packs produced" value={num(m.totalPacks)} />
@@ -177,7 +177,9 @@ function computeMetrics(d: Bundle) {
     if (/qc/i.test(w.reason)) qcByJob.set(w.job_id, (qcByJob.get(w.job_id) ?? 0) + Number(w.grams))
   }
 
-  const completed = d.jobs.filter((j) => j.status === 'Completed' && j.parent)
+  // Only reflect jobs whose child SKU records have been generated.
+  const jobsWithChildren = new Set(d.children.map((c) => c.job_id))
+  const completed = d.jobs.filter((j) => j.status === 'Completed' && j.parent && jobsWithChildren.has(j.id))
   const perJob = completed.map((j) => {
     const inputG = toGrams(j.parent.quantity, j.parent.unit)
     const outputG = (linesByJob.get(j.id) ?? []).reduce((s, l) => s + Number(l.actual_output_g ?? 0), 0)

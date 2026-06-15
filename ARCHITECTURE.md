@@ -142,6 +142,14 @@ directly then `refresh()`. No global store — each page owns its data. Masters 
 
 **Shift** is derived (not captured): Morning 06–14 / Afternoon 14–22 / Night 22–06 from `start_at`.
 
+**Navigation lock:** once a job has `start_at` set and no child SKUs yet (`childCount === 0`), the
+job screen is "locked" — `useBlockNavigation` (`src/lib/navGuard.tsx`) blocks sidebar links and warns
+on browser refresh/close. The user must **Generate Child SKUs** (commit) or **Cancel Process** (revert
+to `Created`, clear actuals + wastage, keep the planned mix) to leave.
+
+**Dashboard scope:** `computeMetrics()` counts a completed job only once its `child_skus` exist
+(filtered by `jobsWithChildren`), so the dashboard reflects only finalized/generated jobs.
+
 ---
 
 ## 7. Deployment
@@ -173,6 +181,7 @@ directly then `refresh()`. No global store — each page owns its data. Masters 
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-15** — Job screen **navigation lock** + **Cancel Process** button (`src/lib/navGuard.tsx`, `NavGuardProvider` in App): can't leave a started-but-ungenerated job without generating child SKUs or cancelling. Dashboard now counts only jobs with generated child SKUs.
 - **2026-06-15** — Added **20g** to the seeded `pack_sizes` and `packaging_costs` (0.30) in `schema.sql`. Existing DBs: add via Config page or re-run `schema.sql` (idempotent).
 - **2026-06-15** — Receipt page: added per-row **Delete** on received parent items (`ParentTable` gains optional `onDelete`). Deletion cascades to that batch's jobs and child SKUs (FK `on delete cascade`); confirm dialog warns about this.
 - **2026-06-15** — Initial build: full prototype (parent receipt, jobs, production capture with start/complete timestamps, wastage, output summary, costing, child SKU generation, records + export, dashboard, config masters). Deployed to GitHub Pages. Cost engine unit-tested. _(commit: initial prototype)_
