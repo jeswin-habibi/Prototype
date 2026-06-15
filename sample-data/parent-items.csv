@@ -1,0 +1,4 @@
+item code,description,unit,batchID,quantity,expiry date,unit cost,total value,warehouse name
+CASH20,Cashew W320,kg,B1001,20,2026-12-31,50,1000,Main WH
+CASH20,Cashew W320,kg,B1002,20,2027-01-31,52,1040,Main WH
+ALM25,Almond Premium,kg,B2001,25,2026-11-30,40,1000,Cold Store
