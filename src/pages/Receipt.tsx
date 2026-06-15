@@ -50,6 +50,23 @@ export default function Receipt() {
     }
   }
 
+  async function deleteItem(item: ParentItem) {
+    if (
+      !confirm(
+        `Delete parent item "${item.item_code}" (batch ${item.batch_id})?\n\n` +
+          'This also deletes any repacking jobs and child SKU records created from this batch.',
+      )
+    )
+      return
+    setMsg(null)
+    const { error } = await supabase.from('parent_items').delete().eq('id', item.id)
+    if (error) setParseError(error.message)
+    else {
+      setMsg(`Deleted ${item.item_code} (batch ${item.batch_id}).`)
+      void refresh()
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -95,14 +112,20 @@ export default function Receipt() {
         ) : !items || items.length === 0 ? (
           <Empty>No parent items received yet.</Empty>
         ) : (
-          <ParentTable rows={items} />
+          <ParentTable rows={items} onDelete={deleteItem} />
         )}
       </Section>
     </div>
   )
 }
 
-function ParentTable({ rows }: { rows: Array<ParsedParent | ParentItem> }) {
+function ParentTable({
+  rows,
+  onDelete,
+}: {
+  rows: Array<ParsedParent | ParentItem>
+  onDelete?: (item: ParentItem) => void
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -115,6 +138,7 @@ function ParentTable({ rows }: { rows: Array<ParsedParent | ParentItem> }) {
                 </th>
               ),
             )}
+            {onDelete && <th className="th" />}
           </tr>
         </thead>
         <tbody>
@@ -130,6 +154,15 @@ function ParentTable({ rows }: { rows: Array<ParsedParent | ParentItem> }) {
               <td className="td">{money(r.unit_cost, 4)}</td>
               <td className="td">{money(r.total_value)}</td>
               <td className="td">{r.warehouse_name}</td>
+              {onDelete && (
+                <td className="td text-right">
+                  {'id' in r && (
+                    <button className="text-rose-600 hover:underline" onClick={() => onDelete(r)}>
+                      Delete
+                    </button>
+                  )}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

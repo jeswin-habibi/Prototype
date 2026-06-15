@@ -173,5 +173,6 @@ directly then `refresh()`. No global store — each page owns its data. Masters 
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-15** — Receipt page: added per-row **Delete** on received parent items (`ParentTable` gains optional `onDelete`). Deletion cascades to that batch's jobs and child SKUs (FK `on delete cascade`); confirm dialog warns about this.
 - **2026-06-15** — Initial build: full prototype (parent receipt, jobs, production capture with start/complete timestamps, wastage, output summary, costing, child SKU generation, records + export, dashboard, config masters). Deployed to GitHub Pages. Cost engine unit-tested. _(commit: initial prototype)_
 - **2026-06-15** — Added this living ARCHITECTURE.md.
