@@ -79,7 +79,7 @@ Defined in `supabase/schema.sql`. All ids are `uuid default gen_random_uuid()`.
 **Masters (admin-editable):**
 - `employees` — `code`, `name`, `active`
 - `machines` — `code`, `name`, `cost_per_hour_override?`, `active`
-- `pack_sizes` — `grams` (unique), `label`, `active`
+- `pack_sizes` — `grams` (unique), `label`, `active` _(seeded: 20, 50, 100, 250)_
 - `wastage_reasons` — `name` (unique), `active`
 - `costing_config` — singleton: `machine_cost_per_hour`, `labor_cost_per_hour`
 - `packaging_costs` — `pack_size_g` (unique), `cost_per_unit`
@@ -173,6 +173,7 @@ directly then `refresh()`. No global store — each page owns its data. Masters 
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-15** — Added **20g** to the seeded `pack_sizes` and `packaging_costs` (0.30) in `schema.sql`. Existing DBs: add via Config page or re-run `schema.sql` (idempotent).
 - **2026-06-15** — Receipt page: added per-row **Delete** on received parent items (`ParentTable` gains optional `onDelete`). Deletion cascades to that batch's jobs and child SKUs (FK `on delete cascade`); confirm dialog warns about this.
 - **2026-06-15** — Initial build: full prototype (parent receipt, jobs, production capture with start/complete timestamps, wastage, output summary, costing, child SKU generation, records + export, dashboard, config masters). Deployed to GitHub Pages. Cost engine unit-tested. _(commit: initial prototype)_
 - **2026-06-15** — Added this living ARCHITECTURE.md.

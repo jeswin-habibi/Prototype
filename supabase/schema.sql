@@ -114,7 +114,7 @@ insert into machines (code, name) values
 on conflict (code) do nothing;
 
 insert into pack_sizes (grams, label) values
-  (50, '50g'), (100, '100g'), (250, '250g')
+  (20, '20g'), (50, '50g'), (100, '100g'), (250, '250g')
 on conflict (grams) do nothing;
 
 insert into wastage_reasons (name) values
@@ -122,7 +122,7 @@ insert into wastage_reasons (name) values
 on conflict (name) do nothing;
 
 insert into packaging_costs (pack_size_g, cost_per_unit) values
-  (50, 0.50), (100, 0.80), (250, 1.50)
+  (20, 0.30), (50, 0.50), (100, 0.80), (250, 1.50)
 on conflict (pack_size_g) do nothing;
 
 insert into costing_config (machine_cost_per_hour, labor_cost_per_hour)
