@@ -5,8 +5,9 @@ import {
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/useData'
 import { toGrams } from '../lib/units'
+import { calculateCost, hoursBetween } from '../lib/cost'
 import { money, num, pct } from '../lib/format'
-import type { ChildSku, JobPackSize, JobWastage, ParentItem, RepackJob } from '../types'
+import type { CostingConfig, JobPackSize, JobWastage, Machine, PackagingCost, ParentItem, RepackJob } from '../types'
 import { Empty, PageHeader, Section, Spinner, Stat } from '../components/ui'
 
 interface Bundle {
@@ -14,26 +15,32 @@ interface Bundle {
   jobs: (RepackJob & { parent: ParentItem })[]
   packLines: JobPackSize[]
   wastage: JobWastage[]
-  children: ChildSku[]
+  config: CostingConfig
+  packagingCosts: PackagingCost[]
+  machines: Machine[]
 }
 
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6', '#ec4899']
 
 export default function Dashboard() {
   const { data, loading } = useData<Bundle>(async () => {
-    const [parents, jobs, packLines, wastage, children] = await Promise.all([
+    const [parents, jobs, packLines, wastage, cfg, pc, machines] = await Promise.all([
       supabase.from('parent_items').select('*'),
       supabase.from('repack_jobs').select('*, parent:parent_items(*)'),
       supabase.from('job_pack_sizes').select('*'),
       supabase.from('job_wastage').select('*'),
-      supabase.from('child_skus').select('*'),
+      supabase.from('costing_config').select('*').limit(1).maybeSingle(),
+      supabase.from('packaging_costs').select('*'),
+      supabase.from('machines').select('*'),
     ])
     return {
       parents: parents.data ?? [],
       jobs: (jobs.data ?? []) as Bundle['jobs'],
       packLines: packLines.data ?? [],
       wastage: wastage.data ?? [],
-      children: children.data ?? [],
+      config: (cfg.data as CostingConfig) ?? { id: '', machine_cost_per_hour: 0, labor_cost_per_hour: 0 },
+      packagingCosts: pc.data ?? [],
+      machines: machines.data ?? [],
     }
   }, [])
 
@@ -49,7 +56,7 @@ export default function Dashboard() {
       {/* KPI strip */}
       <div className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Parents received" value={num(m.parentCount)} sub={`${num(Math.round(m.parentWeightG / 1000))} kg`} />
-        <Stat label="Jobs finalized" value={num(m.completedCount)} sub={`${num(m.jobsTotal)} total jobs`} />
+        <Stat label="Jobs completed" value={num(m.completedCount)} sub={`${num(m.jobsTotal)} total jobs`} />
         <Stat label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
         <Stat label="Avg wastage" value={pct(m.avgWastage)} tone={m.avgWastage <= 5 ? 'good' : 'warn'} />
         <Stat label="Packs produced" value={num(m.totalPacks)} />
@@ -163,6 +170,9 @@ function VarianceTable({ title, rows }: { title: string; rows: { key: string; yi
 }
 
 // ── pure aggregation ────────────────────────────────────────────────────────
+// Computed LIVE from source data via the same calculateCost() engine the job
+// screen uses, so dashboard and job figures always agree. Reflects every job
+// whose status is 'Completed' (independent of child-SKU generation).
 function computeMetrics(d: Bundle) {
   const linesByJob = new Map<string, JobPackSize[]>()
   for (const l of d.packLines) {
@@ -170,28 +180,39 @@ function computeMetrics(d: Bundle) {
     arr.push(l)
     linesByJob.set(l.job_id, arr)
   }
-  const wasteByJob = new Map<string, number>()
-  const qcByJob = new Map<string, number>()
+  const wasteByJob = new Map<string, JobWastage[]>()
   for (const w of d.wastage) {
-    wasteByJob.set(w.job_id, (wasteByJob.get(w.job_id) ?? 0) + Number(w.grams))
-    if (/qc/i.test(w.reason)) qcByJob.set(w.job_id, (qcByJob.get(w.job_id) ?? 0) + Number(w.grams))
+    const arr = wasteByJob.get(w.job_id) ?? []
+    arr.push(w)
+    wasteByJob.set(w.job_id, arr)
   }
+  const packCost = (g: number) => Number(d.packagingCosts.find((p) => Number(p.pack_size_g) === Number(g))?.cost_per_unit ?? 0)
+  const machineByCode = new Map(d.machines.map((m) => [m.code, m]))
 
-  // Only reflect jobs whose child SKU records have been generated.
-  const jobsWithChildren = new Set(d.children.map((c) => c.job_id))
-  const completed = d.jobs.filter((j) => j.status === 'Completed' && j.parent && jobsWithChildren.has(j.id))
+  const completed = d.jobs.filter((j) => j.status === 'Completed' && j.parent)
   const perJob = completed.map((j) => {
-    const inputG = toGrams(j.parent.quantity, j.parent.unit)
-    const outputG = (linesByJob.get(j.id) ?? []).reduce((s, l) => s + Number(l.actual_output_g ?? 0), 0)
+    const lines = linesByJob.get(j.id) ?? []
+    const ws = wasteByJob.get(j.id) ?? []
+    const res = calculateCost({
+      parentMaterialCost: Number(j.parent.total_value),
+      inputWeightG: toGrams(j.parent.quantity, j.parent.unit),
+      machineHours: hoursBetween(j.start_at, j.complete_at),
+      machineCostPerHour: machineByCode.get(j.machine_code)?.cost_per_hour_override ?? d.config.machine_cost_per_hour,
+      laborCostPerHour: d.config.labor_cost_per_hour,
+      packLines: lines.map((l) => ({
+        packSizeG: Number(l.pack_size_g),
+        actualPacks: Number(l.actual_packs ?? 0),
+        packagingPerUnit: packCost(l.pack_size_g),
+      })),
+      wastage: ws.map((w) => ({ reason: w.reason, grams: Number(w.grams) })),
+    })
     return {
-      id: j.id,
+      res,
       machine: j.machine_code,
       operator: j.operator_code,
       shift: j.shift ?? '—',
       month: (j.complete_at ?? j.created_at).slice(0, 7),
-      yield: inputG ? (outputG / inputG) * 100 : 0,
-      wastagePct: inputG ? ((wasteByJob.get(j.id) ?? 0) / inputG) * 100 : 0,
-      qc: qcByJob.get(j.id) ?? 0,
+      qc: ws.filter((w) => /qc/i.test(w.reason)).reduce((s, w) => s + Number(w.grams), 0),
     }
   })
 
@@ -200,32 +221,34 @@ function computeMetrics(d: Bundle) {
     const g = new Map<string, number[]>()
     for (const p of perJob) {
       const k = keyFn(p)
-      g.set(k, [...(g.get(k) ?? []), p.yield])
+      g.set(k, [...(g.get(k) ?? []), p.res.yieldPct])
     }
     return [...g.entries()].map(([key, ys]) => ({ key, yield: avg(ys), jobs: ys.length })).sort((a, b) => a.key.localeCompare(b.key))
   }
 
-  // output & cost by pack size from child SKUs
-  const sizeAgg = new Map<number, { packs: number; costSum: number; costN: number }>()
-  for (const c of d.children) {
-    const s = sizeAgg.get(Number(c.pack_size_g)) ?? { packs: 0, costSum: 0, costN: 0 }
-    s.packs += Number(c.quantity)
-    s.costSum += Number(c.unit_cost)
-    s.costN += 1
-    sizeAgg.set(Number(c.pack_size_g), s)
+  // output (packs) & cost-per-pack by size — live, weighted by packs across completed jobs
+  const sizeAgg = new Map<number, { packs: number; costSum: number }>()
+  for (const p of perJob) {
+    for (const l of p.res.lines) {
+      const s = sizeAgg.get(l.packSizeG) ?? { packs: 0, costSum: 0 }
+      s.packs += l.actualPacks
+      s.costSum += l.lineTotalCost
+      sizeAgg.set(l.packSizeG, s)
+    }
   }
   const outputBySize = [...sizeAgg.entries()].sort((a, b) => a[0] - b[0]).map(([size, v]) => ({ size: `${size}g`, packs: v.packs }))
-  const costBySize = [...sizeAgg.entries()].sort((a, b) => a[0] - b[0]).map(([size, v]) => ({ size: `${size}g`, cost: v.costN ? v.costSum / v.costN : 0 }))
+  const costBySize = [...sizeAgg.entries()].sort((a, b) => a[0] - b[0]).map(([size, v]) => ({ size: `${size}g`, cost: v.packs ? v.costSum / v.packs : 0 }))
 
+  // wastage breakdown — only completed jobs
   const wasteReasonAgg = new Map<string, number>()
-  for (const w of d.wastage) wasteReasonAgg.set(w.reason, (wasteReasonAgg.get(w.reason) ?? 0) + Number(w.grams))
+  for (const j of completed) for (const w of wasteByJob.get(j.id) ?? []) wasteReasonAgg.set(w.reason, (wasteReasonAgg.get(w.reason) ?? 0) + Number(w.grams))
   const wastageByReason = [...wasteReasonAgg.entries()].map(([reason, grams]) => ({ reason, grams }))
 
   // monthly yield + QC
   const monthAgg = new Map<string, { ys: number[]; qc: number }>()
   for (const p of perJob) {
     const cur = monthAgg.get(p.month) ?? { ys: [], qc: 0 }
-    cur.ys.push(p.yield)
+    cur.ys.push(p.res.yieldPct)
     cur.qc += p.qc
     monthAgg.set(p.month, cur)
   }
@@ -240,10 +263,10 @@ function computeMetrics(d: Bundle) {
     parentWeightG: d.parents.reduce((s, p) => s + toGrams(p.quantity, p.unit), 0),
     jobsTotal: d.jobs.length,
     completedCount: completed.length,
-    avgYield: avg(perJob.map((p) => p.yield)),
-    avgWastage: avg(perJob.map((p) => p.wastagePct)),
-    totalPacks: d.children.reduce((s, c) => s + Number(c.quantity), 0),
-    totalValue: d.children.reduce((s, c) => s + Number(c.total_value), 0),
+    avgYield: avg(perJob.map((p) => p.res.yieldPct)),
+    avgWastage: avg(perJob.map((p) => p.res.wastagePct)),
+    totalPacks: perJob.reduce((s, p) => s + p.res.lines.reduce((a, l) => a + l.actualPacks, 0), 0),
+    totalValue: perJob.reduce((s, p) => s + p.res.totalBatchCost, 0),
     outputBySize,
     costBySize,
     wastageByReason,

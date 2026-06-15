@@ -147,8 +147,12 @@ job screen is "locked" — `useBlockNavigation` (`src/lib/navGuard.tsx`) blocks 
 on browser refresh/close. The user must **Generate Child SKUs** (commit) or **Cancel Process** (revert
 to `Created`, clear actuals + wastage, keep the planned mix) to leave.
 
-**Dashboard scope:** `computeMetrics()` counts a completed job only once its `child_skus` exist
-(filtered by `jobsWithChildren`), so the dashboard reflects only finalized/generated jobs.
+**Dashboard scope:** `computeMetrics()` reflects every job with `status === 'Completed'` and computes
+all figures **live** via the same `calculateCost()` engine the job screen uses (loads `costing_config`,
+`packaging_costs`, `machines` for overrides). Dashboard and job-screen numbers therefore always agree.
+`child_skus` are NOT read by the dashboard — they remain the deliberate ERP snapshot for the Records
+page. Cost-per-pack by size is a packs-weighted average across completed jobs; `totalValue` = Σ job
+`totalBatchCost`.
 
 ---
 
@@ -181,6 +185,7 @@ to `Created`, clear actuals + wastage, keep the planned mix) to leave.
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-15** — Dashboard now computes **live** via `calculateCost()` (not the `child_skus` snapshot) and reflects all `status='Completed'` jobs (dropped the child-SKU gate). Job-screen and dashboard numbers always agree now.
 - **2026-06-15** — Jobs list: per-row **Delete** (cascades to plan, wastage, child SKUs; confirm warns).
 - **2026-06-15** — Job screen **navigation lock** + **Cancel Process** button (`src/lib/navGuard.tsx`, `NavGuardProvider` in App): can't leave a started-but-ungenerated job without generating child SKUs or cancelling. Dashboard now counts only jobs with generated child SKUs.
 - **2026-06-15** — Added **20g** to the seeded `pack_sizes` and `packaging_costs` (0.30) in `schema.sql`. Existing DBs: add via Config page or re-run `schema.sql` (idempotent).
