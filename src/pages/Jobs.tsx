@@ -23,6 +23,18 @@ export default function Jobs() {
     return (data ?? []) as JobRow[]
   }, [])
 
+  async function deleteJob(job: JobRow) {
+    if (
+      !confirm(
+        `Delete this repacking job for ${job.parent?.item_code} (batch ${job.parent?.batch_id})?\n\n` +
+          'This also deletes its planned mix, wastage, and any generated child SKU records.',
+      )
+    )
+      return
+    await supabase.from('repack_jobs').delete().eq('id', job.id)
+    void jobs.refresh()
+  }
+
   const refData = useData<{ parents: ParentItem[]; machines: Machine[]; employees: Employee[] }>(async () => {
     const [p, m, e] = await Promise.all([
       supabase.from('parent_items').select('*').order('received_at', { ascending: false }),
@@ -86,9 +98,14 @@ export default function Jobs() {
                     </td>
                     <td className="td">{dateTime(j.created_at)}</td>
                     <td className="td text-right">
-                      <Link to={`/jobs/${j.id}`} className="font-medium text-brand hover:underline">
-                        Open →
-                      </Link>
+                      <div className="flex items-center justify-end gap-3">
+                        <Link to={`/jobs/${j.id}`} className="font-medium text-brand hover:underline">
+                          Open →
+                        </Link>
+                        <button className="text-rose-600 hover:underline" onClick={() => deleteJob(j)}>
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
