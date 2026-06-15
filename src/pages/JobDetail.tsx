@@ -205,8 +205,8 @@ export default function JobDetail() {
         <div className="grid gap-3 sm:grid-cols-4">
           <Stat label="Item" value={parent.item_code} sub={parent.description} />
           <Stat label="Input weight" value={formatWeight(inputWeightG)} sub={`${parent.quantity}${parent.unit}`} />
-          <Stat label="Start" value={job.start_at ? dateTime(job.start_at) : '—'} sub={job.shift ?? ''} />
-          <Stat label="Complete" value={job.complete_at ? dateTime(job.complete_at) : '—'} sub={job.start_at && job.complete_at ? `${hoursBetween(job.start_at, job.complete_at).toFixed(2)} h` : ''} />
+          <Stat label="Start" valueClassName="text-sm" value={job.start_at ? dateTime(job.start_at) : '—'} sub={job.shift ?? ''} />
+          <Stat label="Complete" valueClassName="text-sm" value={job.complete_at ? dateTime(job.complete_at) : '—'} sub={job.start_at && job.complete_at ? `${hoursBetween(job.start_at, job.complete_at).toFixed(2)} h` : ''} />
         </div>
       </Section>
 

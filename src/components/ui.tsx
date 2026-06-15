@@ -25,7 +25,19 @@ export function Section({ title, children, actions }: { title: string; children:
   )
 }
 
-export function Stat({ label, value, sub, tone = 'default' }: { label: string; value: ReactNode; sub?: string; tone?: 'default' | 'good' | 'warn' | 'bad' }) {
+export function Stat({
+  label,
+  value,
+  sub,
+  tone = 'default',
+  valueClassName = 'text-2xl',
+}: {
+  label: string
+  value: ReactNode
+  sub?: string
+  tone?: 'default' | 'good' | 'warn' | 'bad'
+  valueClassName?: string
+}) {
   const toneCls = {
     default: 'text-slate-900',
     good: 'text-emerald-600',
@@ -35,7 +47,7 @@ export function Stat({ label, value, sub, tone = 'default' }: { label: string; v
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-bold ${toneCls}`}>{value}</div>
+      <div className={`mt-1 font-bold ${valueClassName} ${toneCls}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-slate-400">{sub}</div>}
     </div>
   )
