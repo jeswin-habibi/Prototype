@@ -9,21 +9,29 @@ export function useData<T>(loader: () => Promise<T>, deps: unknown[] = []) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const memoLoader = useCallback(loader, deps)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      setData(await memoLoader())
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [memoLoader])
+  const load = useCallback(
+    async (showLoading: boolean) => {
+      if (showLoading) setLoading(true)
+      setError(null)
+      try {
+        setData(await memoLoader())
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [memoLoader],
+  )
 
+  // Silent refresh (used after mutations) — keeps existing content on screen
+  // instead of blanking to the spinner on every keystroke/blur.
+  const refresh = useCallback(() => load(false), [load])
+
+  // Show the spinner only on first load / when the resource (deps) changes.
   useEffect(() => {
-    void refresh()
-  }, [refresh])
+    void load(true)
+  }, [load])
 
   return { data, loading, error, refresh, setData }
 }
