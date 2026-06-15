@@ -13,6 +13,10 @@ deployed to **GitHub Pages**.
 ## Live app
 `https://jeswin-habibi.github.io/Prototype/` (after the first successful Pages deploy).
 
+## Architecture
+See [ARCHITECTURE.md](ARCHITECTURE.md) — the living design doc (data model, cost model, screen
+flow, conventions, iteration log). **Keep it updated in the same commit as any structural change.**
+
 ## Workflow
 1. **Parent Receipt** — upload the GRN Excel/CSV (item code, description, unit, batchID, quantity,
    expiry, unit cost, total value, warehouse).
