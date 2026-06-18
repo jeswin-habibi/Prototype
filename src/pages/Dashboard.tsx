@@ -55,12 +55,12 @@ export default function Dashboard() {
 
       {/* KPI strip */}
       <div className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Parents received" value={num(m.parentCount)} sub={`${num(Math.round(m.parentWeightG / 1000))} kg`} />
-        <Stat label="Jobs completed" value={num(m.completedCount)} sub={`${num(m.jobsTotal)} total jobs`} />
-        <Stat label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
-        <Stat label="Avg wastage" value={pct(m.avgWastage)} tone={m.avgWastage <= 5 ? 'good' : 'warn'} />
-        <Stat label="Packs produced" value={num(m.totalPacks)} />
-        <Stat label="Output value" value={money(m.totalValue)} />
+        <Stat icon="📦" valueClassName="text-xl" label="Parents received" value={num(m.parentCount)} sub={`${num(Math.round(m.parentWeightG / 1000))} kg`} />
+        <Stat icon="✅" valueClassName="text-xl" label="Jobs completed" value={num(m.completedCount)} sub={`${num(m.jobsTotal)} total jobs`} />
+        <Stat icon="📈" valueClassName="text-xl" label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
+        <Stat icon="🗑️" valueClassName="text-xl" label="Avg wastage" value={pct(m.avgWastage)} tone={m.avgWastage <= 5 ? 'good' : 'warn'} />
+        <Stat icon="🧱" valueClassName="text-xl" label="Packs produced" value={num(m.totalPacks)} />
+        <Stat icon="💰" valueClassName="text-xl" label="Output value" value={money(m.totalValue)} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

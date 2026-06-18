@@ -165,7 +165,7 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 ---
 
 ## 8. Conventions
-- Tailwind component classes live in `src/index.css` (`.btn-primary`, `.card`, `.input`, `.label`, `.th`, `.td`, `.badge`). Prefer these over ad-hoc utility soup.
+- **Design system:** Inter font; brand teal scale (`brand-50..900`) + `shadow-soft/card/lift` in `tailwind.config.js`; soft radial-gradient body background. Tailwind component classes live in `src/index.css` (`.btn-primary` gradient, `.card`, `.input`, `.label`, `.icon-chip`, `.th`, `.td`, `.badge`). Prefer these over ad-hoc utility soup. `Stat` takes an optional `icon` (tinted chip) + `tone`.
 - Keep calculation logic **pure** in `src/lib` and unit-tested; pages stay thin (fetch + render).
 - `types.ts` mirrors `schema.sql` exactly — change both together.
 - Money formatted via `format.ts` (no currency symbol — locale-agnostic).
@@ -185,6 +185,7 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-15** — Visual redesign: Inter font, brand teal scale + soft shadows, gradient body background, gradient buttons/brand marks, icon-chip stat cards, accent section headers, dotted status badges, polished nav active states.
 - **2026-06-15** — Mobile UX: app-style **bottom tab bar** + mobile top app bar (desktop keeps the sidebar); browse screens (Jobs, Records, Receipt) render as **cards on mobile**, tables on `md+`. `Stat` gained `valueClassName`.
 - **2026-06-15** — Dashboard now computes **live** via `calculateCost()` (not the `child_skus` snapshot) and reflects all `status='Completed'` jobs (dropped the child-SKU gate). Job-screen and dashboard numbers always agree now.
 - **2026-06-15** — Jobs list: per-row **Delete** (cascades to plan, wastage, child SKUs; confirm warns).
