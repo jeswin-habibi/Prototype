@@ -75,43 +75,82 @@ export default function Jobs() {
         ) : !jobs.data || jobs.data.length === 0 ? (
           <Empty>No jobs yet. Create one to begin.</Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  {['Parent', 'Batch', 'Machine', 'Operator', 'Status', 'Created', ''].map((h) => (
-                    <th key={h} className="th">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.data.map((j) => (
-                  <tr key={j.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="td font-medium">{j.parent?.item_code}</td>
-                    <td className="td">{j.parent?.batch_id}</td>
-                    <td className="td">{j.machine_code}</td>
-                    <td className="td">{j.operator_code}</td>
-                    <td className="td">
-                      <StatusBadge status={j.status} />
-                    </td>
-                    <td className="td">{dateTime(j.created_at)}</td>
-                    <td className="td text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <Link to={`/jobs/${j.id}`} className="font-medium text-brand hover:underline">
-                          Open →
-                        </Link>
-                        <button className="text-rose-600 hover:underline" onClick={() => deleteJob(j)}>
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {/* Mobile: cards */}
+            <div className="space-y-3 md:hidden">
+              {jobs.data.map((j) => (
+                <Link
+                  key={j.id}
+                  to={`/jobs/${j.id}`}
+                  className="block rounded-xl border border-slate-200 bg-white p-3 active:bg-slate-50"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-slate-900">{j.parent?.item_code}</div>
+                      <div className="text-xs text-slate-500">Batch {j.parent?.batch_id}</div>
+                    </div>
+                    <StatusBadge status={j.status} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                    <span>🛠 {j.machine_code}</span>
+                    <span>👷 {j.operator_code}</span>
+                    <span>🕒 {dateTime(j.created_at)}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
+                    <span className="text-sm font-medium text-brand">Open →</span>
+                    <button
+                      className="text-sm text-rose-600"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        deleteJob(j)
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    {['Parent', 'Batch', 'Machine', 'Operator', 'Status', 'Created', ''].map((h) => (
+                      <th key={h} className="th">
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {jobs.data.map((j) => (
+                    <tr key={j.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="td font-medium">{j.parent?.item_code}</td>
+                      <td className="td">{j.parent?.batch_id}</td>
+                      <td className="td">{j.machine_code}</td>
+                      <td className="td">{j.operator_code}</td>
+                      <td className="td">
+                        <StatusBadge status={j.status} />
+                      </td>
+                      <td className="td">{dateTime(j.created_at)}</td>
+                      <td className="td text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <Link to={`/jobs/${j.id}`} className="font-medium text-brand hover:underline">
+                            Open →
+                          </Link>
+                          <button className="text-rose-600 hover:underline" onClick={() => deleteJob(j)}>
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Section>
     </div>

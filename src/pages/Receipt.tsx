@@ -127,46 +127,82 @@ function ParentTable({
   onDelete?: (item: ParentItem) => void
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-slate-200">
-            {['Item Code', 'Description', 'Unit', 'Batch', 'Qty', 'Weight (g)', 'Expiry', 'Unit Cost', 'Total Value', 'Warehouse'].map(
-              (h) => (
-                <th key={h} className="th">
-                  {h}
-                </th>
-              ),
+    <>
+      {/* Mobile: cards */}
+      <div className="space-y-3 md:hidden">
+        {rows.map((r, i) => (
+          <div key={i} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-semibold text-slate-900">{r.item_code}</div>
+                <div className="text-xs text-slate-500">{r.description}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-bold text-slate-900">{money(r.total_value)}</div>
+                <div className="text-[11px] text-slate-400">total value</div>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+              <span><span className="text-slate-400">Batch:</span> {r.batch_id}</span>
+              <span><span className="text-slate-400">Qty:</span> {r.quantity} {r.unit}</span>
+              <span><span className="text-slate-400">Weight:</span> {toGrams(r.quantity, r.unit).toLocaleString()} g</span>
+              <span><span className="text-slate-400">Unit cost:</span> {money(r.unit_cost, 4)}</span>
+              <span><span className="text-slate-400">Expiry:</span> {dateOnly(r.expiry_date)}</span>
+              <span><span className="text-slate-400">WH:</span> {r.warehouse_name}</span>
+            </div>
+            {onDelete && 'id' in r && (
+              <div className="mt-2 flex justify-end border-t border-slate-100 pt-2">
+                <button className="text-sm text-rose-600" onClick={() => onDelete(r)}>
+                  Delete
+                </button>
+              </div>
             )}
-            {onDelete && <th className="th" />}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-b border-slate-100">
-              <td className="td font-medium">{r.item_code}</td>
-              <td className="td">{r.description}</td>
-              <td className="td">{r.unit}</td>
-              <td className="td">{r.batch_id}</td>
-              <td className="td">{r.quantity}</td>
-              <td className="td">{toGrams(r.quantity, r.unit).toLocaleString()}</td>
-              <td className="td">{dateOnly(r.expiry_date)}</td>
-              <td className="td">{money(r.unit_cost, 4)}</td>
-              <td className="td">{money(r.total_value)}</td>
-              <td className="td">{r.warehouse_name}</td>
-              {onDelete && (
-                <td className="td text-right">
-                  {'id' in r && (
-                    <button className="text-rose-600 hover:underline" onClick={() => onDelete(r)}>
-                      Delete
-                    </button>
-                  )}
-                </td>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-200">
+              {['Item Code', 'Description', 'Unit', 'Batch', 'Qty', 'Weight (g)', 'Expiry', 'Unit Cost', 'Total Value', 'Warehouse'].map(
+                (h) => (
+                  <th key={h} className="th">
+                    {h}
+                  </th>
+                ),
               )}
+              {onDelete && <th className="th" />}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} className="border-b border-slate-100">
+                <td className="td font-medium">{r.item_code}</td>
+                <td className="td">{r.description}</td>
+                <td className="td">{r.unit}</td>
+                <td className="td">{r.batch_id}</td>
+                <td className="td">{r.quantity}</td>
+                <td className="td">{toGrams(r.quantity, r.unit).toLocaleString()}</td>
+                <td className="td">{dateOnly(r.expiry_date)}</td>
+                <td className="td">{money(r.unit_cost, 4)}</td>
+                <td className="td">{money(r.total_value)}</td>
+                <td className="td">{r.warehouse_name}</td>
+                {onDelete && (
+                  <td className="td text-right">
+                    {'id' in r && (
+                      <button className="text-rose-600 hover:underline" onClick={() => onDelete(r)}>
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }

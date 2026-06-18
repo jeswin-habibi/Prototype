@@ -185,6 +185,7 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-15** — Mobile UX: app-style **bottom tab bar** + mobile top app bar (desktop keeps the sidebar); browse screens (Jobs, Records, Receipt) render as **cards on mobile**, tables on `md+`. `Stat` gained `valueClassName`.
 - **2026-06-15** — Dashboard now computes **live** via `calculateCost()` (not the `child_skus` snapshot) and reflects all `status='Completed'` jobs (dropped the child-SKU gate). Job-screen and dashboard numbers always agree now.
 - **2026-06-15** — Jobs list: per-row **Delete** (cascades to plan, wastage, child SKUs; confirm warns).
 - **2026-06-15** — Job screen **navigation lock** + **Cancel Process** button (`src/lib/navGuard.tsx`, `NavGuardProvider` in App): can't leave a started-but-ungenerated job without generating child SKUs or cancelling. Dashboard now counts only jobs with generated child SKUs.
