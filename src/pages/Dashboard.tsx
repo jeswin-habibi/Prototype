@@ -102,11 +102,11 @@ export default function Dashboard() {
           </Chart>
         </Section>
 
-        <Section title="Month-on-Month Yield & QC Rejects">
-          <Chart empty={m.monthly.length === 0}>
-            <LineChart data={m.monthly}>
+        <Section title="Daily Yield & QC Rejects">
+          <Chart empty={m.daily.length === 0}>
+            <LineChart data={m.daily}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" fontSize={12} />
+              <XAxis dataKey="day" tickFormatter={(d) => String(d).slice(5)} fontSize={12} />
               <YAxis yAxisId="left" fontSize={12} />
               <YAxis yAxisId="right" orientation="right" fontSize={12} />
               <Tooltip />
@@ -211,7 +211,7 @@ function computeMetrics(d: Bundle) {
       machine: j.machine_code,
       operator: j.operator_code,
       shift: j.shift ?? '—',
-      month: (j.complete_at ?? j.created_at).slice(0, 7),
+      day: (j.complete_at ?? j.created_at).slice(0, 10),
       qc: ws.filter((w) => /qc/i.test(w.reason)).reduce((s, w) => s + Number(w.grams), 0),
     }
   })
@@ -244,16 +244,16 @@ function computeMetrics(d: Bundle) {
   for (const j of completed) for (const w of wasteByJob.get(j.id) ?? []) wasteReasonAgg.set(w.reason, (wasteReasonAgg.get(w.reason) ?? 0) + Number(w.grams))
   const wastageByReason = [...wasteReasonAgg.entries()].map(([reason, grams]) => ({ reason, grams }))
 
-  // monthly yield + QC
-  const monthAgg = new Map<string, { ys: number[]; qc: number }>()
+  // daily yield + QC
+  const dayAgg = new Map<string, { ys: number[]; qc: number }>()
   for (const p of perJob) {
-    const cur = monthAgg.get(p.month) ?? { ys: [], qc: 0 }
+    const cur = dayAgg.get(p.day) ?? { ys: [], qc: 0 }
     cur.ys.push(p.res.yieldPct)
     cur.qc += p.qc
-    monthAgg.set(p.month, cur)
+    dayAgg.set(p.day, cur)
   }
-  const monthly = [...monthAgg.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([month, v]) => ({
-    month,
+  const daily = [...dayAgg.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, v]) => ({
+    day,
     yield: Number(avg(v.ys).toFixed(1)),
     qc: v.qc,
   }))
@@ -270,7 +270,7 @@ function computeMetrics(d: Bundle) {
     outputBySize,
     costBySize,
     wastageByReason,
-    monthly,
+    daily,
     byMachine: groupYield((p) => p.machine),
     byOperator: groupYield((p) => p.operator),
     byShift: groupYield((p) => p.shift),
