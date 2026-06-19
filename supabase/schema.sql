@@ -156,6 +156,7 @@ create table if not exists child_skus (
 alter table child_skus add column if not exists category text not null default '';
 alter table child_skus add column if not exists child_barcode text not null default '';
 alter table child_skus add column if not exists output_product_code text;
+alter table child_skus alter column parent_item_id drop not null;  -- legacy link; primary input is set, but allow null
 
 -- Frozen per-job cost result (written at "Generate Child SKUs"); the dashboard reads these
 -- instead of recomputing history over every row.

@@ -220,7 +220,7 @@ export default function JobDetail() {
           const rc = resolveChild(data!.map, productCode, l.packSizeG, primary?.description ?? productCode)
           return {
             job_id: id,
-            parent_item_id: inputs.length === 1 ? primary?.id ?? null : null,
+            parent_item_id: primary?.id ?? null, // legacy link → primary input (blends keep the input list in job_parents)
             output_product_code: productCode,
             child_item_code: rc.child_code,
             description: rc.child_description,
