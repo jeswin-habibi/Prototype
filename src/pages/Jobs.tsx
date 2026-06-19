@@ -111,20 +111,20 @@ export default function Jobs() {
             {/* Mobile: cards */}
             <div className="space-y-3 md:hidden">
               {jobs.data.map((j) => (
-                <Link key={j.id} to={`/jobs/${j.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 active:bg-slate-50">
+                <Link key={j.id} to={`/jobs/${j.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 active:bg-slate-50 dark:border-ink-700 dark:bg-ink-800 dark:active:bg-ink-700">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="font-semibold text-slate-900">{j.output_product_code || j.parent?.item_code || 'Job'}</div>
-                      <div className="text-xs text-slate-500">{j.process_type}</div>
+                      <div className="font-semibold text-slate-900 dark:text-white">{j.output_product_code || j.parent?.item_code || 'Job'}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">{j.process_type}</div>
                     </div>
                     <StatusBadge status={j.status} />
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                    <span>🛠 {j.machine_code ?? 'Manual'}</span>
-                    <span>👷 {j.operator_code}</span>
-                    <span>🕒 {dateTime(j.created_at)}</span>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                    <span>{j.machine_code ?? 'Manual'}</span>
+                    <span>{j.operator_code}</span>
+                    <span>{dateTime(j.created_at)}</span>
                   </div>
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2">
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 dark:border-ink-700">
                     <span className="text-sm font-medium text-brand">Open →</span>
                     <button className="text-sm text-rose-600" onClick={(e) => { e.preventDefault(); deleteJob(j) }}>
                       Delete
@@ -138,7 +138,7 @@ export default function Jobs() {
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-200">
+                  <tr className="border-b border-slate-200 dark:border-ink-700">
                     {['Output', 'Type', 'Machine', 'Operator', 'Status', 'Created', ''].map((h) => (
                       <th key={h} className="th">{h}</th>
                     ))}
@@ -146,8 +146,8 @@ export default function Jobs() {
                 </thead>
                 <tbody>
                   {jobs.data.map((j) => (
-                    <tr key={j.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="td font-medium">{j.output_product_code || j.parent?.item_code || '—'}</td>
+                    <tr key={j.id} className="border-b border-slate-100 hover:bg-slate-50 dark:border-ink-800 dark:hover:bg-ink-800/50">
+                      <td className="td font-medium dark:text-white">{j.output_product_code || j.parent?.item_code || '—'}</td>
                       <td className="td">{j.process_type}</td>
                       <td className="td">{j.machine_code ?? '—'}</td>
                       <td className="td">{j.operator_code}</td>
@@ -291,7 +291,9 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
   const soonestId = filtered.find((p) => remainingG(p) > 0 && !!p.expiry_date)?.id ?? null
   const bigBtn = (active: boolean) =>
     `flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 py-6 text-base font-bold transition ${
-      active ? 'border-brand bg-brand-50 text-brand-700 shadow-soft' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+      active
+        ? 'border-brand bg-brand-50 text-brand-700 shadow-soft dark:bg-brand/15 dark:text-brand-light'
+        : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-ink-700 dark:bg-ink-800 dark:text-slate-400 dark:hover:border-ink-600'
     }`
 
   return (
@@ -344,7 +346,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
         {selectedEntries.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {selectedEntries.map(([pid, w]) => (
-              <span key={pid} className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700">
+              <span key={pid} className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700 dark:bg-brand/15 dark:text-brand-light">
                 <button type="button" className="font-medium" onClick={() => editQty(parentsById[pid])}>{parentsById[pid]?.item_code}: {w} kg</button>
                 <button type="button" className="text-brand-700/60 hover:text-rose-600" onClick={() => removeSelected(pid)} aria-label="Remove">✕</button>
               </span>
@@ -354,8 +356,8 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
 
         {/* dropdown panel */}
         {open && (
-          <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 shadow-card">
-            <div className="border-b border-slate-100 p-2">
+          <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card dark:border-ink-700 dark:bg-ink-800">
+            <div className="border-b border-slate-100 p-2 dark:border-ink-700">
               <input className="input" autoFocus placeholder="Search description / ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
               <p className="mt-1 px-1 text-[11px] font-medium text-slate-400">↓ Soonest expiry first — use the top one first</p>
             </div>
@@ -368,11 +370,11 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
                   const rem = remainingG(p)
                   const days = daysUntil(p.expiry_date)
                   return (
-                    <label key={p.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-50 px-3 py-2 ${checked ? 'bg-brand-50/40' : 'hover:bg-slate-50'}`}>
+                    <label key={p.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-50 px-3 py-2 dark:border-ink-800 ${checked ? 'bg-brand-50/40 dark:bg-brand/10' : 'hover:bg-slate-50 dark:hover:bg-ink-700/50'}`}>
                       <input type="checkbox" className="h-4 w-4 shrink-0" checked={checked} disabled={rem <= 0 && !checked} onChange={() => onCheck(p)} />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
-                          <span className="flex items-center gap-1.5 font-medium text-slate-800">
+                          <span className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-100">
                             {p.item_code}
                             {p.id === soonestId && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">⏱ Use first</span>}
                           </span>
@@ -391,7 +393,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
                 })
               )}
             </div>
-            <div className="flex justify-end border-t border-slate-100 p-2">
+            <div className="flex justify-end border-t border-slate-100 p-2 dark:border-ink-700">
               <button
                 type="button"
                 className="btn-secondary"
@@ -431,9 +433,9 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
       {/* Required-qty prompt — portal to body, centred modal */}
       {qtyFor && createPortal(
         <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4" onClick={() => { setQtyFor(null); setQtyInput('') }}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lift" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-slate-900">Required quantity</h3>
-            <p className="mt-1 text-sm text-slate-600">{qtyFor.item_code} — {qtyFor.description}</p>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lift dark:bg-ink-800" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Required quantity</h3>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{qtyFor.item_code} — {qtyFor.description}</p>
             <p className="mt-0.5 text-xs text-slate-400">Available: {formatWeight(remainingG(qtyFor))}</p>
             <label className="label mt-4">Weight to draw (kg)</label>
             <input

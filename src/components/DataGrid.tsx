@@ -37,6 +37,8 @@ export interface DataGridProps {
   exportColumns?: { header: string; field: string }[]
   fileBaseName?: string
   subtitle?: ReactNode
+  collapsible?: boolean
+  defaultOpen?: boolean
 }
 
 function coerce(type: GridColType, raw: string): unknown {
@@ -59,6 +61,8 @@ export default function DataGrid({
   exportColumns,
   fileBaseName = table,
   subtitle,
+  collapsible,
+  defaultOpen,
 }: DataGridProps) {
   const { data, loading, error, refresh } = useData<Record<string, unknown>[]>(async () => {
     const { data, error } = await supabase.from(table).select('*').order(orderBy, { ascending })
@@ -128,6 +132,8 @@ export default function DataGrid({
   return (
     <Section
       title={title}
+      collapsible={collapsible}
+      defaultOpen={defaultOpen}
       actions={
         <div className="flex flex-wrap gap-2">
           {onImport && (
@@ -172,7 +178,7 @@ export default function DataGrid({
           {/* Mobile: each row is a card with labelled fields */}
           <div className="space-y-3 md:hidden">
             {data.map((row) => (
-              <div key={String(row.id)} className="rounded-xl border border-slate-200 bg-white p-3 shadow-soft">
+              <div key={String(row.id)} className="rounded-xl border border-slate-200 bg-white p-3 shadow-soft dark:border-ink-700 dark:bg-ink-900">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   {cols.map((c) => (
                     <div key={c.field} className={c.type === 'boolean' ? 'col-span-2 flex items-center justify-between' : ''}>
@@ -192,7 +198,7 @@ export default function DataGrid({
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200">
+                <tr className="border-b border-slate-200 dark:border-ink-700">
                   {cols.map((c) => (
                     <th key={c.field} className="th">{c.label}</th>
                   ))}
@@ -201,7 +207,7 @@ export default function DataGrid({
               </thead>
               <tbody>
                 {data.map((row) => (
-                  <tr key={String(row.id)} className="border-b border-slate-100">
+                  <tr key={String(row.id)} className="border-b border-slate-100 dark:border-ink-800">
                     {cols.map((c) => (
                       <td key={c.field} className="td">
                         <Cell col={c} row={row} onSave={(v) => persist(row, c.field, v)} />

@@ -181,6 +181,23 @@ export function IconHome({ className }: P) {
   )
 }
 
+export function IconTag({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0l-7-7A2 2 0 0 1 3 12.2V4a2 2 0 0 1 2-2h8.2a2 2 0 0 1 1.4.6l6 6a2 2 0 0 1 0 2.8z" />
+      <circle cx="7.5" cy="7.5" r="1.3" />
+    </svg>
+  )
+}
+
+export function IconChevron({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}
+
 export function IconClipboard({ className }: P) {
   return (
     <svg {...svg(className)}>

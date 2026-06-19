@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/useData'
 import { parseParentChildMap } from '../lib/excel'
@@ -21,7 +20,7 @@ function CostingConfigEditor() {
   }
 
   return (
-    <Section title="Costing Config (rates)">
+    <Section title="Costing Config (rates)" collapsible defaultOpen={false}>
       {loading ? (
         <Spinner />
       ) : !data ? (
@@ -53,25 +52,14 @@ function CostingConfigEditor() {
 }
 
 export default function Config() {
-  const [showMaster, setShowMaster] = useState(false)
   return (
     <div>
-      <PageHeader title="Configuration" subtitle="Admin masters & rates. Changes save on blur." />
+      <PageHeader title="Configuration" subtitle="Admin masters & rates. Tap a master to open it; changes save on blur." />
 
-      <button
-        onClick={() => setShowMaster((v) => !v)}
-        className="mb-4 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold uppercase tracking-wide text-slate-700 shadow-card transition hover:bg-slate-50"
-      >
-        <span className="flex items-center gap-2.5">
-          <span className="h-4 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" />
-          Parent-Child Master
-        </span>
-        <span className="text-xs font-semibold text-brand">{showMaster ? '▲ Hide' : '▼ Open'}</span>
-      </button>
-
-      {showMaster && (
       <DataGrid
         title="Parent-Child Master"
+        collapsible
+        defaultOpen
         subtitle="Maps a product (Parent ID) at a pack size to its child SKU. A blend is just rows entered under the blend's own Parent ID. Import appends/updates by (Parent ID, Size)."
         table="parent_child_map"
         orderBy="parent_code"
@@ -109,10 +97,11 @@ export default function Config() {
         ]}
         fileBaseName="parent-child-master"
       />
-      )}
 
       <DataGrid
         title="Employee Master"
+        collapsible
+        defaultOpen={false}
         table="employees"
         orderBy="code"
         cols={[
@@ -125,6 +114,8 @@ export default function Config() {
 
       <DataGrid
         title="Machine Master"
+        collapsible
+        defaultOpen={false}
         table="machines"
         orderBy="code"
         cols={[
@@ -138,6 +129,8 @@ export default function Config() {
 
       <DataGrid
         title="Pack Sizes"
+        collapsible
+        defaultOpen={false}
         table="pack_sizes"
         orderBy="grams"
         cols={[
@@ -150,6 +143,8 @@ export default function Config() {
 
       <DataGrid
         title="Wastage Reasons"
+        collapsible
+        defaultOpen={false}
         table="wastage_reasons"
         orderBy="name"
         cols={[
@@ -161,6 +156,8 @@ export default function Config() {
 
       <DataGrid
         title="Packaging Cost (per pack size)"
+        collapsible
+        defaultOpen={false}
         table="packaging_costs"
         orderBy="pack_size_g"
         cols={[

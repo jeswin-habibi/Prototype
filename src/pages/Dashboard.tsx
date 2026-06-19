@@ -7,7 +7,7 @@ import { useData } from '../lib/useData'
 import { money, num, pct } from '../lib/format'
 import type { JobCostSnapshot, JobStatus, ProcessType } from '../types'
 import { Empty, PageHeader, Section, Spinner } from '../components/ui'
-import { IconBox, IconCheckCircle, IconCoins, IconExport, IconGear, IconImport, IconPause, IconRecords, IconTrash, IconTrendUp, IconWeight } from '../components/icons'
+import { IconBox, IconCheckCircle, IconCoins, IconExport, IconGear, IconImport, IconPause, IconRecords, IconTag, IconTrash, IconTrendUp, IconWeight } from '../components/icons'
 
 // Re-render charts/colors when the dark class toggles.
 function useIsDark() {
@@ -19,13 +19,17 @@ function useIsDark() {
   }, [])
   return dark
 }
-const chartColors = (dark: boolean) => ({
-  grid: dark ? '#1e2a3d' : '#eef2f7',
-  axis: dark ? '#94a3b8' : '#64748b',
-  tooltip: dark
-    ? { backgroundColor: '#0d141f', border: '1px solid #243044', borderRadius: 10, color: '#e2e8f0' }
-    : { borderRadius: 10, border: '1px solid #e2e8f0' },
-})
+const chartColors = (dark: boolean) => {
+  const text = dark ? '#e2e8f0' : '#0f172a'
+  const axis = dark ? '#94a3b8' : '#64748b'
+  return {
+    grid: dark ? '#1e2a3d' : '#eef2f7',
+    axis,
+    tooltip: { backgroundColor: dark ? '#0d141f' : '#ffffff', border: `1px solid ${dark ? '#243044' : '#e2e8f0'}`, borderRadius: 10, color: text },
+    tipItem: { color: text },
+    tipLabel: { color: axis },
+  }
+}
 
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6', '#ec4899', '#22c55e']
 
@@ -42,14 +46,14 @@ interface Bundle {
   productNames: Record<string, string>
 }
 type Granularity = 'day' | 'month' | 'year'
-type Tab = 'Overview' | 'Production' | 'Cost' | 'Wastage' | 'Time'
-const TABS: Tab[] = ['Overview', 'Production', 'Cost', 'Wastage', 'Time']
+type Tab = 'Production' | 'Cost' | 'Wastage' | 'Time'
+const TABS: Tab[] = ['Production', 'Cost', 'Wastage', 'Time']
 
 export default function Dashboard() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [gran, setGran] = useState<Granularity>('month')
-  const [tab, setTab] = useState<Tab>('Overview')
+  const [tab, setTab] = useState<Tab>('Production')
   const [drillOutput, setDrillOutput] = useState<number | null>(null)
   const [drillCost, setDrillCost] = useState<number | null>(null)
   const [drillWasteReason, setDrillWasteReason] = useState<string | null>(null)
@@ -114,7 +118,7 @@ export default function Dashboard() {
             <XAxis dataKey="key" tick={{ fontSize: 11, fill: cc.axis }} />
             <YAxis yAxisId="l" tick={{ fontSize: 11, fill: cc.axis }} />
             <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 11, fill: cc.axis }} />
-            <Tooltip contentStyle={cc.tooltip} labelStyle={{ color: cc.axis }} />
+            <Tooltip contentStyle={cc.tooltip} itemStyle={cc.tipItem} labelStyle={cc.tipLabel} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Line yAxisId="l" type="monotone" dataKey="outputKg" name="Output (kg)" stroke="#14b8a6" strokeWidth={2.5} dot={false} />
             <Line yAxisId="r" type="monotone" dataKey="yield" name="Yield %" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
@@ -156,7 +160,7 @@ export default function Dashboard() {
             <Kpi accent="purple" Icon={IconWeight} label="Wastage" value={`${num(Math.round(m.totalWastageKg))}kg`} />
             <Kpi accent="blue" Icon={IconBox} label="Packs" value={compact(m.packsProduced)} />
             <Kpi accent="amber" Icon={IconCoins} label="Value" value={compact(m.outputValue)} unit="KWD" />
-            <Kpi accent="teal" Icon={IconCheckCircle} label="Done" value={num(m.statusCounts.Completed)} tone="good" />
+            <Kpi accent="teal" Icon={IconTag} label="Cost/pk" value={money(m.packsProduced ? m.outputValue / m.packsProduced : 0, 2)} unit="KWD" />
           </div>
 
           {/* Job pipeline — highlighted panel; Created = total jobs, others = current status */}
@@ -173,7 +177,7 @@ export default function Dashboard() {
           </div>
 
           {/* Tab bar */}
-          <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-soft">
+          <div className="mb-4 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-soft dark:border-ink-700 dark:bg-ink-800">
             {TABS.map((t) => (
               <button
                 key={t}
@@ -186,13 +190,6 @@ export default function Dashboard() {
           </div>
 
           {/* Tab content (each tab = 1–2 full-width charts → little scrolling) */}
-          {tab === 'Overview' && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {trendCard}
-              <Section title="Output by pack size"><Bars data={m.outputBySize} xKey="label" yKey="packs" yLabel="packs" /></Section>
-            </div>
-          )}
-
           {tab === 'Production' && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Section title={drillOutput == null ? 'Output by pack size' : `Output — ${drillOutput}g by child (high → low)`}>
@@ -243,7 +240,7 @@ export default function Dashboard() {
                         >
                           {m.wastageByReason.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
-                        <Tooltip contentStyle={cc.tooltip} formatter={(v: number) => `${num(v)} g`} />
+                        <Tooltip contentStyle={cc.tooltip} itemStyle={cc.tipItem} labelStyle={cc.tipLabel} formatter={(v: number) => `${num(v)} g`} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -374,7 +371,7 @@ function Bars({
         <CartesianGrid strokeDasharray="3 3" stroke={cc.grid} />
         <XAxis dataKey={xKey} tick={{ fontSize: 10, fill: cc.axis }} interval={0} angle={-20} textAnchor="end" height={54} tickFormatter={(v: string) => (String(v).length > 12 ? `${String(v).slice(0, 11)}…` : String(v))} />
         <YAxis tick={{ fontSize: 11, fill: cc.axis }} />
-        <Tooltip contentStyle={cc.tooltip} labelStyle={{ color: cc.axis }} formatter={(v: number) => (isMoney ? money(v, 4) : `${num(v)} ${yLabel}`)} />
+        <Tooltip contentStyle={cc.tooltip} itemStyle={cc.tipItem} labelStyle={cc.tipLabel} formatter={(v: number) => (isMoney ? money(v, 4) : `${num(v)} ${yLabel}`)} />
         <Bar dataKey={yKey} radius={[4, 4, 0, 0]} cursor={onBarClick ? 'pointer' : undefined}
           onClick={onBarClick ? (e: unknown) => onBarClick((e as { payload: Record<string, unknown> }).payload) : undefined}>
           {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}

@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { JobStatus } from '../types'
+import { IconChevron } from './icons'
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
@@ -13,14 +14,46 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   )
 }
 
-export function Section({ title, children, actions }: { title: string; children: ReactNode; actions?: ReactNode }) {
+export function Section({
+  title,
+  children,
+  actions,
+  collapsible,
+  defaultOpen = true,
+}: {
+  title: string
+  children: ReactNode
+  actions?: ReactNode
+  collapsible?: boolean
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  const heading = (
+    <h2 className="flex items-center gap-2.5 text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
+      <span className="h-4 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" />
+      {title}
+    </h2>
+  )
+  if (collapsible) {
+    return (
+      <section className="card mb-4">
+        <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-2 text-left">
+          {heading}
+          <IconChevron className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
+        </button>
+        {open && (
+          <div className="mt-4">
+            {actions && <div className="mb-3 flex flex-wrap justify-end gap-2">{actions}</div>}
+            {children}
+          </div>
+        )}
+      </section>
+    )
+  }
   return (
     <section className="card mb-4">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2.5 text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
-          <span className="h-4 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" />
-          {title}
-        </h2>
+        {heading}
         {actions}
       </div>
       {children}
