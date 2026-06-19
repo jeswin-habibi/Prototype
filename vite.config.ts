@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['logo.jpg'],
       manifest: {
         name: 'Re-Pack IQ',
         short_name: 'Re-Pack IQ',
@@ -20,10 +20,10 @@ export default defineConfig({
         scope: '/Prototype/',
         start_url: '/Prototype/',
         icons: [
-          { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'logo.jpg', sizes: '192x192', type: 'image/jpeg' },
+          { src: 'logo.jpg', sizes: '512x512', type: 'image/jpeg' },
+          { src: 'logo.jpg', sizes: '192x192', type: 'image/jpeg', purpose: 'maskable' },
+          { src: 'logo.jpg', sizes: '512x512', type: 'image/jpeg', purpose: 'maskable' },
         ],
       },
     }),

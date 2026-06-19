@@ -144,7 +144,7 @@ function useTheme() {
 }
 
 function Logo({ className }: { className?: string }) {
-  return <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Re-Pack IQ" className={className} />
+  return <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Re-Pack IQ" className={className} />
 }
 
 export default function App() {
