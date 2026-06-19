@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -12,7 +12,7 @@ const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6'
 
 type ChildRow = {
   pack_size_g: number; quantity: number; unit_cost: number; total_value: number
-  child_item_code: string; output_product_code: string | null; category: string; created_at: string
+  child_item_code: string; description: string; output_product_code: string | null; category: string; created_at: string
 }
 type WasteRow = {
   grams: number; reason: string
@@ -33,6 +33,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState<Tab>('Overview')
   const [drillOutput, setDrillOutput] = useState<number | null>(null)
   const [drillCost, setDrillCost] = useState<number | null>(null)
+  const [drillWasteReason, setDrillWasteReason] = useState<string | null>(null)
 
   const { data, loading } = useData<Bundle>(async () => {
     const range = <T extends { gte: (c: string, v: string) => T; lte: (c: string, v: string) => T }>(q: T, col: string, hiSuffix = '') => {
@@ -44,7 +45,7 @@ export default function Dashboard() {
     const countStatus = (s: JobStatus) => supabase.from('repack_jobs').select('id', { count: 'exact', head: true }).eq('status', s)
     const [snapRes, childRes, wasteRes, mapRes, cCreated, cProcessing, cHold, cCompleted] = await Promise.all([
       range(supabase.from('job_cost_snapshot').select('*'), 'completed_on'),
-      range(supabase.from('child_skus').select('pack_size_g, quantity, unit_cost, total_value, child_item_code, output_product_code, category, created_at'), 'created_at', 'T23:59:59'),
+      range(supabase.from('child_skus').select('pack_size_g, quantity, unit_cost, total_value, child_item_code, description, output_product_code, category, created_at'), 'created_at', 'T23:59:59'),
       supabase.from('job_wastage').select('grams, reason, job:repack_jobs(process_type, output_product_code, complete_at, status)'),
       supabase.from('parent_child_map').select('parent_code, parent_description'),
       countStatus('Created'), countStatus('Processing'), countStatus('On Hold'), countStatus('Completed'),
@@ -60,6 +61,17 @@ export default function Dashboard() {
       statusCounts: { Created: cCreated.count ?? 0, Processing: cProcessing.count ?? 0, 'On Hold': cHold.count ?? 0, Completed: cCompleted.count ?? 0 },
     }
   }, [from, to])
+
+  // Default the date range to the data's span once it loads (so the fields aren't blank).
+  useEffect(() => {
+    if (!data || from || to) return
+    const dates = data.snaps.map((s) => s.completed_on).filter((x): x is string => !!x).sort()
+    if (dates.length) { setFrom(dates[0]); setTo(dates[dates.length - 1]) }
+  }, [data, from, to])
+  const resetRange = () => {
+    const dates = (data?.snaps ?? []).map((s) => s.completed_on).filter((x): x is string => !!x).sort()
+    if (dates.length) { setFrom(dates[0]); setTo(dates[dates.length - 1]) } else { setFrom(''); setTo('') }
+  }
 
   const m = useMemo(() => (data ? computeMetrics(data, gran, from, to) : null), [data, gran, from, to])
 
@@ -105,8 +117,8 @@ export default function Dashboard() {
           <label className="label">To</label>
           <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
-        <button className="btn-secondary shrink-0" onClick={() => { setFrom(''); setTo('') }} disabled={!from && !to}>
-          Clear
+        <button className="btn-secondary shrink-0" onClick={resetRange} disabled={!data}>
+          Reset
         </button>
       </div>
 
@@ -123,7 +135,6 @@ export default function Dashboard() {
             <Kpi label="Wastage" value={`${num(Math.round(m.totalWastageKg))}kg`} />
             <Kpi label="Packs" value={compact(m.packsProduced)} />
             <Kpi label="Value" value={compact(m.outputValue)} />
-            <Kpi label="Done" value={num(m.statusCounts.Completed)} tone="good" />
           </div>
 
           {/* Status pipeline — Created = total jobs; others = current status */}
@@ -181,17 +192,36 @@ export default function Dashboard() {
 
           {tab === 'Wastage' && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Section title="Wastage by reason">
-                {m.wastageByReason.length === 0 ? <Empty>No wastage in range.</Empty> : (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie data={m.wastageByReason} dataKey="grams" nameKey="reason" cx="50%" cy="44%" outerRadius={72}>
-                        {m.wastageByReason.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                      </Pie>
-                      <Tooltip formatter={(v: number) => `${num(v)} g`} />
-                      <Legend wrapperStyle={{ fontSize: 11 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
+              <Section title={drillWasteReason ? `Wastage — ${drillWasteReason} by parent` : 'Wastage by reason'}>
+                {drillWasteReason ? (
+                  <>
+                    <button className="mb-2 text-sm text-brand hover:underline" onClick={() => setDrillWasteReason(null)}>← All reasons</button>
+                    <Bars data={m.wasteByReasonParent[drillWasteReason] ?? []} xKey="label" yKey="grams" yLabel="grams" />
+                  </>
+                ) : m.wastageByReason.length === 0 ? (
+                  <Empty>No wastage in range.</Empty>
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={m.wastageByReason}
+                          dataKey="grams"
+                          nameKey="reason"
+                          cx="50%"
+                          cy="44%"
+                          outerRadius={72}
+                          cursor="pointer"
+                          onClick={(_, index) => setDrillWasteReason(m.wastageByReason[index]?.reason ?? null)}
+                        >
+                          {m.wastageByReason.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => `${num(v)} g`} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <p className="mt-1 text-xs text-slate-400">Tap a slice to see the contributing parents.</p>
+                  </>
                 )}
               </Section>
               <Section title="Wastage: Manual vs Machine"><Bars data={m.wastageByProcess} xKey="label" yKey="grams" yLabel="grams" /></Section>
@@ -305,14 +335,14 @@ function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) 
   const sizeAgg = new Map<number, { packs: number; value: number }>()
   const outputDrill: Record<number, { label: string; packs: number; size: number }[]> = {}
   const costDrill: Record<number, { label: string; cost: number; size: number }[]> = {}
-  const sizeChild = new Map<number, Map<string, { packs: number; value: number }>>()
+  const sizeChild = new Map<number, Map<string, { packs: number; value: number; desc: string }>>()
   for (const c of d.children) {
     const size = Number(c.pack_size_g)
     const a = sizeAgg.get(size) ?? { packs: 0, value: 0 }
     a.packs += Number(c.quantity); a.value += Number(c.total_value)
     sizeAgg.set(size, a)
     const cm = sizeChild.get(size) ?? new Map()
-    const cc = cm.get(c.child_item_code) ?? { packs: 0, value: 0 }
+    const cc = cm.get(c.child_item_code) ?? { packs: 0, value: 0, desc: c.description || c.child_item_code }
     cc.packs += Number(c.quantity); cc.value += Number(c.total_value)
     cm.set(c.child_item_code, cc); sizeChild.set(size, cm)
   }
@@ -320,9 +350,9 @@ function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) 
   const outputBySize = sizes.map((s) => ({ label: `${s}g`, packs: sizeAgg.get(s)!.packs, size: s }))
   const costBySize = sizes.map((s) => { const a = sizeAgg.get(s)!; return { label: `${s}g`, cost: a.packs ? a.value / a.packs : 0, size: s } })
   for (const s of sizes) {
-    const entries = [...(sizeChild.get(s) ?? new Map()).entries()] as [string, { packs: number; value: number }][]
-    outputDrill[s] = entries.map(([code, v]) => ({ label: code, packs: v.packs, size: s })).sort((a, b) => b.packs - a.packs)
-    costDrill[s] = entries.map(([code, v]) => ({ label: code, cost: v.packs ? v.value / v.packs : 0, size: s })).sort((a, b) => b.cost - a.cost)
+    const entries = [...(sizeChild.get(s) ?? new Map()).entries()] as [string, { packs: number; value: number; desc: string }][]
+    outputDrill[s] = entries.map(([, v]) => ({ label: v.desc, packs: v.packs, size: s })).sort((a, b) => b.packs - a.packs)
+    costDrill[s] = entries.map(([, v]) => ({ label: v.desc, cost: v.packs ? v.value / v.packs : 0, size: s })).sort((a, b) => b.cost - a.cost)
   }
 
   const inRange = (isoStr: string | null) => {
@@ -342,6 +372,17 @@ function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) 
   const wastageByProcess = groupSum(waste, (w) => w.job!.process_type, (w) => Number(w.grams))
   const wastageByParent = groupSum(waste, (w) => w.job!.output_product_code ?? '—', (w) => Number(w.grams)).slice(0, 12).map((r) => ({ ...r, label: nameOf(r.label) }))
   const wastageByCategory = groupSum(waste, (w) => catByProduct[w.job!.output_product_code ?? ''] ?? 'Uncategorized', (w) => Number(w.grams))
+
+  // For the pie drill-through: which parents contribute to each wastage reason.
+  const wrp: Record<string, Map<string, number>> = {}
+  for (const w of waste) {
+    const reason = w.reason || 'Unknown'
+    const parent = nameOf(w.job!.output_product_code ?? '—')
+    ;(wrp[reason] ??= new Map()).set(parent, (wrp[reason].get(parent) ?? 0) + Number(w.grams))
+  }
+  const wasteByReasonParent: Record<string, { label: string; grams: number }[]> = {}
+  for (const [reason, mp] of Object.entries(wrp))
+    wasteByReasonParent[reason] = [...mp.entries()].map(([label, grams]) => ({ label, grams })).sort((a, b) => b.grams - a.grams).slice(0, 12)
 
   const keyOf = (s: JobCostSnapshot) => {
     const day = (s.completed_on ?? '').slice(0, 10)
@@ -378,6 +419,6 @@ function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) 
     avgWastePct: inputG ? (totalWastageG / inputG) * 100 : 0, totalWastageKg: totalWastageG / 1000,
     packsProduced: sum(snaps.map((s) => Number(s.packs_produced))), outputValue: sum(snaps.map((s) => Number(s.total_batch_cost))),
     statusCounts: d.statusCounts, outputBySize, costBySize, outputDrill, costDrill,
-    wastageByReason, wastageByProcess, wastageByParent, wastageByCategory, trend, timeByParent, timeByCategory, byProcess,
+    wastageByReason, wastageByProcess, wastageByParent, wastageByCategory, wasteByReasonParent, trend, timeByParent, timeByCategory, byProcess,
   }
 }
