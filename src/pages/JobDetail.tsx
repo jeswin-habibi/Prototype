@@ -121,10 +121,13 @@ export default function JobDetail() {
     }
   }, [data, id, refresh])
 
-  const locked = !!(data && data.job.start_at && data.childCount === 0)
+  // A started, ungenerated job is "in progress". We only BLOCK navigation while actively
+  // Processing — an On-Hold job can be left and resumed later.
+  const inProgress = !!(data && data.job.start_at && data.childCount === 0)
+  const locked = inProgress && data!.job.status !== 'On Hold'
   useBlockNavigation(
     locked,
-    'Finish this job before leaving: stop processing, then click “Generate Child SKUs”, or click “Cancel Process” to discard this run.',
+    'Finish this job before leaving: stop processing, then click “Generate Child SKUs”, or “Cancel Process”. (Put it On Hold if you need to step away.)',
   )
 
   if (loading) return <Spinner />
@@ -277,7 +280,7 @@ export default function JobDetail() {
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge status={status} />
-            {locked && (
+            {inProgress && (
               <button className="btn-danger" onClick={cancelProcess} disabled={busy}>Cancel Process</button>
             )}
           </div>
@@ -523,20 +526,28 @@ function WastageSection({
   )
 }
 
+function Mini({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'bad' }) {
+  const t = tone === 'good' ? 'text-emerald-600' : tone === 'warn' ? 'text-amber-600' : tone === 'bad' ? 'text-rose-600' : 'text-slate-900'
+  return (
+    <div className="rounded-lg border border-slate-200/70 bg-white px-2.5 py-1.5">
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className={`text-sm font-bold leading-snug ${t}`}>{value}</div>
+    </div>
+  )
+}
+
 function OutputSummary({ result, activeSec, packs }: { result: CostResult; activeSec: number; packs: number }) {
   return (
     <Section title="Output Summary">
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Input weight" value={formatWeight(result.inputWeightG)} />
-        <Stat label="Actual output" value={formatWeight(result.totalActualOutputG)} />
-        <Stat label="Yield %" value={pct(result.yieldPct)} tone={result.yieldPct >= 90 ? 'good' : result.yieldPct >= 75 ? 'warn' : 'bad'} />
-        <Stat label="Lost yield %" value={pct(result.lostYieldPct)} tone={result.lostYieldPct <= 10 ? 'good' : 'warn'} />
-        <Stat label="Wastage" value={`${(result.totalWastageG / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 })} kg`} sub={pct(result.wastagePct)} />
-        <Stat label="Time taken" value={formatDuration(activeSec)} />
-        <Stat label="Packs produced" value={num(packs)} />
-        {result.processVarianceG !== 0 && (
-          <Stat label="Unaccounted" value={`${num(result.processVarianceG)} g`} tone="warn" sub="input − output − wastage" />
-        )}
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        <Mini label="Input" value={formatWeight(result.inputWeightG)} />
+        <Mini label="Output" value={formatWeight(result.totalActualOutputG)} />
+        <Mini label="Yield" value={pct(result.yieldPct)} tone={result.yieldPct >= 90 ? 'good' : result.yieldPct >= 75 ? 'warn' : 'bad'} />
+        <Mini label="Lost yield" value={pct(result.lostYieldPct)} tone={result.lostYieldPct <= 10 ? 'good' : 'warn'} />
+        <Mini label="Wastage" value={`${(result.totalWastageG / 1000).toLocaleString(undefined, { maximumFractionDigits: 2 })} kg`} />
+        <Mini label="Time" value={formatDuration(activeSec)} />
+        <Mini label="Packs" value={num(packs)} />
+        {result.processVarianceG !== 0 && <Mini label="Unaccounted" value={`${num(result.processVarianceG)} g`} tone="warn" />}
       </div>
     </Section>
   )
@@ -553,41 +564,37 @@ function CostingSection({
 }) {
   return (
     <Section title="Repacking Cost Sheet">
-      <div className="grid gap-3 sm:grid-cols-4">
-        <Stat label="Material cost" value={money(result.parentMaterialCost)} />
-        <Stat label="Total repacking cost" value={money(result.totalRepackingCost)} />
-        <Stat label="Total batch cost" value={money(result.totalBatchCost)} />
-        <Stat label="Cost / gram (blended)" value={money(result.blendedCostPerGram, 4)} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Mini label="Material" value={money(result.parentMaterialCost)} />
+        <Mini label="Repacking" value={money(result.totalRepackingCost)} />
+        <Mini label="Total batch" value={money(result.totalBatchCost)} />
+        <Mini label="Cost / gram" value={money(result.blendedCostPerGram, 4)} />
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 p-3 text-sm">
-          <h3 className="mb-2 font-semibold text-slate-600">Repacking cost breakdown</h3>
-          <Row label="Packaging cost" value={money(result.packagingCost)} />
-          <Row label={`Machine cost${manual ? ' (manual → 0)' : ` (${machineHours.toFixed(2)} h × ${money(machineRate)})`}`} value={money(result.machineCost)} />
-          <Row label={`Labor cost (${machineHours.toFixed(2)} h × ${money(laborRate)})`} value={money(result.laborCost)} />
-          <Row label="Total repacking cost" value={money(result.totalRepackingCost)} bold />
-          <Row label="Actual output weight" value={`${num(result.totalActualOutputG)} g`} />
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 p-3 text-[13px]">
+          <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Cost breakdown</h3>
+          <Row label="Packaging" value={money(result.packagingCost)} />
+          <Row label={manual ? 'Machine (manual → 0)' : `Machine (${machineHours.toFixed(1)}h × ${money(machineRate, 0)})`} value={money(result.machineCost)} />
+          <Row label={`Labor (${machineHours.toFixed(1)}h × ${money(laborRate, 0)})`} value={money(result.laborCost)} />
+          <Row label="Total repacking" value={money(result.totalRepackingCost)} bold />
         </div>
 
-        <div className="rounded-lg border border-slate-200 p-3 text-sm">
-          <h3 className="mb-2 font-semibold text-slate-600">Cost per pack</h3>
-          <table className="w-full">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 p-3">
+          <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Cost per pack</h3>
+          <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="th">Size</th>
-                <th className="th">Packs</th>
-                <th className="th">Packaging</th>
-                <th className="th">Cost / pack</th>
+                <th className="th !py-1.5">Size</th><th className="th !py-1.5">Packs</th><th className="th !py-1.5">Pkg</th><th className="th !py-1.5">Cost/pack</th>
               </tr>
             </thead>
             <tbody>
               {result.lines.map((l) => (
                 <tr key={l.packSizeG} className="border-b border-slate-100">
-                  <td className="td font-medium">{l.packSizeG}g</td>
-                  <td className="td">{num(l.actualPacks)}</td>
-                  <td className="td">{money(l.packagingPerUnit, 2)}</td>
-                  <td className="td font-semibold">{money(l.costPerPack, 4)}</td>
+                  <td className="td !py-1.5 font-medium">{l.packSizeG}g</td>
+                  <td className="td !py-1.5">{num(l.actualPacks)}</td>
+                  <td className="td !py-1.5">{money(l.packagingPerUnit, 2)}</td>
+                  <td className="td !py-1.5 font-semibold">{money(l.costPerPack, 4)}</td>
                 </tr>
               ))}
             </tbody>
@@ -600,7 +607,7 @@ function CostingSection({
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between py-1 ${bold ? 'border-t border-slate-200 font-semibold' : ''}`}>
+    <div className={`flex justify-between py-0.5 ${bold ? 'mt-0.5 border-t border-slate-200 pt-1 font-semibold' : ''}`}>
       <span className="text-slate-500">{label}</span>
       <span>{value}</span>
     </div>

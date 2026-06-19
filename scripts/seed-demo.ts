@@ -100,8 +100,8 @@ for (const p of RAW) {
     parentInsert.push(
       parentRow({
         item_code: p.code, description: `${p.name} ${p.bagKg}kg bag`, category: p.cat,
-        batch_id: `${p.code}-B${String(batchSeq).padStart(3, '0')}`, qty: 40, weight_per_unit: p.bagKg, weight_unit: 'kg',
-        expiry_date: isoDate(now + expiryDays * DAY), total_cost: 40 * p.bagKg * p.costKg,
+        batch_id: `${p.code}-B${String(batchSeq).padStart(3, '0')}`, qty: 60, weight_per_unit: p.bagKg, weight_unit: 'kg',
+        expiry_date: isoDate(now + expiryDays * DAY), total_cost: 60 * p.bagKg * p.costKg,
         warehouse_name: p.cat === 'Dried Fruit' ? 'WH-C' : 'WH-A',
       }),
     )
@@ -218,12 +218,14 @@ for (let i = 0; i < N; i++) {
   const prod = byCode[output]
   const size = prod.sizes[i % prod.sizes.length]
   const processType: 'Machine' | 'Manual' = i % 9 < 5 ? 'Manual' : 'Machine'
+  const isMachine = processType === 'Machine'
   const operator = `EMP${String((i % 10) + 1).padStart(2, '0')}`
   const machine = `MC-0${(i % 3) + 1}`
-  const yieldPct = 0.88 + (i % 11) * 0.0095
-  const durMin = 70 + (i % 8) * 15
+  // Machines run higher yield, faster throughput (less labour/pack) → higher yield + lower cost/pack.
+  const yieldPct = isMachine ? 0.94 + (i % 5) * 0.008 : 0.86 + (i % 7) * 0.009
+  const packsTarget = (isMachine ? 170 : 110) + (i % 6) * 20
+  const durMin = Math.max(isMachine ? 35 : 90, Math.round(packsTarget / (isMachine ? 4.2 : 0.9)))
   const holdMin = i % 6 === 0 ? 20 + (i % 3) * 10 : 0
-  const packsTarget = 90 + (i % 7) * 28
   const totalIn = Math.round((packsTarget * size) / yieldPct)
 
   let inputs: Input[]
@@ -319,6 +321,13 @@ check('Status pipeline has all states', ['Created', 'Processing', 'On Hold', 'Co
 
 const months = new Set(allSnaps.map((s) => String(s.completed_on).slice(0, 7)))
 check('Data spans multiple months', months.size >= 4, `${months.size} months: ${[...months].sort().join(', ')}`)
+
+const snapBy = (pt: string) => allSnaps.filter((s) => s.process_type === pt)
+const avgY = (rows: any[]) => (rows.length ? rows.reduce((a, s) => a + Number(s.yield_pct), 0) / rows.length : 0)
+const costPP = (rows: any[]) => { const p = rows.reduce((a, s) => a + Number(s.packs_produced), 0); return p ? rows.reduce((a, s) => a + Number(s.total_batch_cost), 0) / p : 0 }
+const mach = snapBy('Machine'), man = snapBy('Manual')
+check('Machine avg yield > Manual avg yield', avgY(mach) > avgY(man), `M ${avgY(mach).toFixed(1)}% vs ${avgY(man).toFixed(1)}%`)
+check('Machine cost/pack < Manual cost/pack', costPP(mach) < costPP(man), `M ${costPP(mach).toFixed(3)} vs ${costPP(man).toFixed(3)}`)
 
 // ─────────────────────────── 8. Summary ───────────────────────────
 const passed = results.filter((r) => r.ok).length

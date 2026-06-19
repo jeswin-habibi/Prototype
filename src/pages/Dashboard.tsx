@@ -102,21 +102,21 @@ export default function Dashboard() {
         <Spinner />
       ) : (
         <>
-          {/* Compact KPI tiles — 2-up on mobile, 4-up on desktop */}
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Kpi label="Input" value={`${num(Math.round(m.inputKg))} kg`} />
-            <Kpi label="Output" value={`${num(Math.round(m.outputKg))} kg`} />
-            <Kpi label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
-            <Kpi label="Avg waste" value={pct(m.avgWastePct)} tone={m.avgWastePct <= 5 ? 'good' : 'warn'} />
-            <Kpi label="Wastage" value={`${num(Math.round(m.totalWastageKg))} kg`} />
-            <Kpi label="Packs" value={num(m.packsProduced)} />
-            <Kpi label="Output value" value={money(m.outputValue, 0)} />
-            <Kpi label="Completed" value={num(m.statusCounts.Completed)} tone="good" />
+          {/* Compact KPI tiles — 4-up, dense, abbreviated values */}
+          <div className="mb-3 grid grid-cols-4 gap-1.5 sm:gap-2">
+            <Kpi label="In (kg)" value={num(Math.round(m.inputKg))} />
+            <Kpi label="Out (kg)" value={num(Math.round(m.outputKg))} />
+            <Kpi label="Yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
+            <Kpi label="Waste" value={pct(m.avgWastePct)} tone={m.avgWastePct <= 5 ? 'good' : 'warn'} />
+            <Kpi label="Wastage" value={`${num(Math.round(m.totalWastageKg))}kg`} />
+            <Kpi label="Packs" value={compact(m.packsProduced)} />
+            <Kpi label="Value" value={compact(m.outputValue)} />
+            <Kpi label="Done" value={num(m.statusCounts.Completed)} tone="good" />
           </div>
 
-          {/* Status pipeline — single compact strip */}
+          {/* Status pipeline — Created = total jobs; others = current status */}
           <div className="mb-4 flex divide-x divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-soft">
-            <Pipe label="Created" n={m.statusCounts.Created} />
+            <Pipe label="Created" n={m.statusCounts.Created + m.statusCounts.Processing + m.statusCounts['On Hold'] + m.statusCounts.Completed} />
             <Pipe label="Processing" n={m.statusCounts.Processing} tone="text-amber-600" />
             <Pipe label="On Hold" n={m.statusCounts['On Hold']} tone="text-orange-600" />
             <Pipe label="Completed" n={m.statusCounts.Completed} tone="text-emerald-600" />
@@ -137,14 +137,14 @@ export default function Dashboard() {
 
           {/* Tab content (each tab = 1–2 full-width charts → little scrolling) */}
           {tab === 'Overview' && (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {trendCard}
               <Section title="Output by pack size"><Bars data={m.outputBySize} xKey="label" yKey="packs" yLabel="packs" /></Section>
             </div>
           )}
 
           {tab === 'Production' && (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Section title={drillOutput == null ? 'Output by pack size' : `Output — ${drillOutput}g by child (high → low)`}>
                 {drillOutput != null && <button className="mb-2 text-sm text-brand hover:underline" onClick={() => setDrillOutput(null)}>← All sizes</button>}
                 <Bars data={drillOutput == null ? m.outputBySize : (m.outputDrill[drillOutput] ?? [])} xKey="label" yKey="packs" yLabel="packs" onBarClick={drillOutput == null ? (e) => setDrillOutput(Number(e.size)) : undefined} />
@@ -155,7 +155,7 @@ export default function Dashboard() {
           )}
 
           {tab === 'Cost' && (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Section title={drillCost == null ? 'Cost per pack by size' : `Cost / pack — ${drillCost}g by child`}>
                 {drillCost != null && <button className="mb-2 text-sm text-brand hover:underline" onClick={() => setDrillCost(null)}>← All sizes</button>}
                 <Bars data={drillCost == null ? m.costBySize : (m.costDrill[drillCost] ?? [])} xKey="label" yKey="cost" yLabel="cost/pack" money onBarClick={drillCost == null ? (e) => setDrillCost(Number(e.size)) : undefined} />
@@ -168,15 +168,16 @@ export default function Dashboard() {
           )}
 
           {tab === 'Wastage' && (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Section title="Wastage by reason">
                 {m.wastageByReason.length === 0 ? <Empty>No wastage in range.</Empty> : (
-                  <ResponsiveContainer width="100%" height={230}>
+                  <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
-                      <Pie data={m.wastageByReason} dataKey="grams" nameKey="reason" outerRadius={85} label={(e) => e.reason}>
+                      <Pie data={m.wastageByReason} dataKey="grams" nameKey="reason" cx="50%" cy="44%" outerRadius={72}>
                         {m.wastageByReason.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                       </Pie>
                       <Tooltip formatter={(v: number) => `${num(v)} g`} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -188,7 +189,7 @@ export default function Dashboard() {
           )}
 
           {tab === 'Time' && (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <Section title="Avg production time by parent (min)"><Bars data={m.timeByParent} xKey="label" yKey="minutes" yLabel="min" /></Section>
               <Section title="Avg production time by category (min)"><Bars data={m.timeByCategory} xKey="label" yKey="minutes" yLabel="min" /></Section>
               <Section title="Manual vs Machine"><ProcessTable rows={m.byProcess} /></Section>
@@ -200,15 +201,20 @@ export default function Dashboard() {
   )
 }
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'good' | 'warn' | 'bad' }) {
+function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'bad' }) {
   const t = tone === 'good' ? 'text-emerald-600' : tone === 'warn' ? 'text-amber-600' : tone === 'bad' ? 'text-rose-600' : 'text-slate-900'
   return (
-    <div className="rounded-xl border border-slate-200/70 bg-white px-3 py-2 shadow-soft">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className={`text-base font-extrabold leading-tight sm:text-lg ${t}`}>{value}</div>
-      {sub && <div className="text-[10px] text-slate-400">{sub}</div>}
+    <div className="rounded-lg border border-slate-200/70 bg-white px-2 py-1.5 shadow-soft">
+      <div className="truncate text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className={`truncate text-[13px] font-extrabold leading-tight sm:text-base ${t}`}>{value}</div>
     </div>
   )
+}
+
+function compact(n: number): string {
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`
+  return `${Math.round(n)}`
 }
 
 function Pipe({ label, n, tone = 'text-slate-700' }: { label: string; n: number; tone?: string }) {
