@@ -87,16 +87,22 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard"
-        actions={
-          <div className="flex flex-wrap items-end gap-2">
-            <div><label className="label">From</label><input className="input max-w-[140px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-            <div><label className="label">To</label><input className="input max-w-[140px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
-            {(from || to) && <button className="btn-secondary" onClick={() => { setFrom(''); setTo('') }}>Clear</button>}
-          </div>
-        }
-      />
+      <PageHeader title="Dashboard" />
+
+      {/* Date filter — own row, fixed layout (Clear always present so nothing reflows) */}
+      <div className="mb-4 flex max-w-md items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <label className="label">From</label>
+          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <label className="label">To</label>
+          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <button className="btn-secondary shrink-0" onClick={() => { setFrom(''); setTo('') }} disabled={!from && !to}>
+          Clear
+        </button>
+      </div>
 
       {loading || !m ? (
         <Spinner />
