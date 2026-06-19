@@ -201,17 +201,6 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
   const fefoWarn = (p: ParentItem) =>
     (refData?.parents ?? []).some((o) => o.item_code === p.item_code && o.id !== p.id && remainingG(o) > 0 && !!o.expiry_date && !!p.expiry_date && o.expiry_date < p.expiry_date)
 
-  // The single soonest-expiring batch that still has stock → tagged "Use first".
-  const soonestId = useMemo(() => {
-    let best: string | null = null, bestDate: string | null = null
-    for (const p of refData?.parents ?? []) {
-      const rem = Number(p.total_weight_g) - (refData?.consumed[p.id] ?? 0)
-      if (rem <= 0 || !p.expiry_date) continue
-      if (bestDate == null || p.expiry_date < bestDate) { bestDate = p.expiry_date; best = p.id }
-    }
-    return best
-  }, [refData])
-
   const selectedEntries = Object.entries(selected).filter(([, w]) => Number(w) > 0)
   const totalDrawnG = selectedEntries.reduce((s, [, w]) => s + (Number(w) || 0) * 1000, 0)
   const selectedCodes = [...new Set(selectedEntries.map(([pid]) => parentsById[pid]?.item_code).filter(Boolean))]
@@ -297,6 +286,8 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
     if (!q) return true
     return p.description.toLowerCase().includes(q) || p.item_code.toLowerCase().includes(q)
   })
+  // Soonest in-stock batch among the current results (list is already expiry-sorted) → "Use first".
+  const soonestId = filtered.find((p) => remainingG(p) > 0 && !!p.expiry_date)?.id ?? null
   const bigBtn = (active: boolean) =>
     `flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 py-6 text-base font-bold transition ${
       active ? 'border-brand bg-brand-50 text-brand-700 shadow-soft' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
