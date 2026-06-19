@@ -97,8 +97,7 @@ function AppShell() {
       {/* Mobile top app bar */}
       <header className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-light to-brand text-white shadow-soft">📦</div>
-        <div className="text-sm font-bold text-slate-900">Repacking</div>
-        <div className="ml-auto text-[11px] font-medium text-slate-400">Landed-cost</div>
+        <div className="text-sm font-bold text-slate-900">Re-Pack IQ</div>
       </header>
 
       <div className="md:flex">
@@ -107,8 +106,8 @@ function AppShell() {
           <div className="flex items-center gap-2.5 px-4 py-5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-light to-brand text-lg text-white shadow-soft">📦</div>
             <div>
-              <div className="text-sm font-bold leading-tight text-slate-900">Repacking</div>
-              <div className="text-xs text-slate-400">Landed-cost prototype</div>
+              <div className="text-sm font-bold leading-tight text-slate-900">Re-Pack IQ</div>
+              <div className="text-xs text-slate-400">Smart repacking</div>
             </div>
           </div>
           <nav className="flex flex-col gap-1 px-3 pb-4">
