@@ -1,128 +1,8 @@
-import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/useData'
-import { Banner, Empty, PageHeader, Section, Spinner } from '../components/ui'
-
-type ColType = 'text' | 'number' | 'boolean'
-interface Col {
-  field: string
-  label: string
-  type: ColType
-}
-
-/** Generic CRUD editor for a flat master table. */
-function MasterEditor({
-  title,
-  table,
-  cols,
-  defaultRow,
-  orderBy,
-}: {
-  title: string
-  table: string
-  cols: Col[]
-  defaultRow: Record<string, unknown>
-  orderBy: string
-}) {
-  const { data, loading, error, refresh } = useData<Record<string, unknown>[]>(async () => {
-    const { data, error } = await supabase.from(table).select('*').order(orderBy)
-    if (error) throw error
-    return data ?? []
-  }, [table])
-  const [busy, setBusy] = useState(false)
-
-  async function update(id: string, field: string, value: unknown) {
-    setBusy(true)
-    await supabase.from(table).update({ [field]: value }).eq('id', id)
-    setBusy(false)
-    void refresh()
-  }
-  async function add() {
-    setBusy(true)
-    await supabase.from(table).insert(defaultRow)
-    setBusy(false)
-    void refresh()
-  }
-  async function remove(id: string) {
-    if (!confirm('Delete this row?')) return
-    setBusy(true)
-    await supabase.from(table).delete().eq('id', id)
-    setBusy(false)
-    void refresh()
-  }
-
-  return (
-    <Section
-      title={title}
-      actions={
-        <button className="btn-secondary" onClick={add} disabled={busy}>
-          + Add
-        </button>
-      }
-    >
-      {error && <Banner tone="error">{error}</Banner>}
-      {loading ? (
-        <Spinner />
-      ) : !data || data.length === 0 ? (
-        <Empty>No entries yet.</Empty>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                {cols.map((c) => (
-                  <th key={c.field} className="th">
-                    {c.label}
-                  </th>
-                ))}
-                <th className="th" />
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row) => (
-                <tr key={String(row.id)} className="border-b border-slate-100">
-                  {cols.map((c) => (
-                    <td key={c.field} className="td">
-                      {c.type === 'boolean' ? (
-                        <input
-                          type="checkbox"
-                          checked={Boolean(row[c.field])}
-                          onChange={(e) => update(String(row.id), c.field, e.target.checked)}
-                        />
-                      ) : (
-                        <input
-                          className="input max-w-[180px]"
-                          type={c.type === 'number' ? 'number' : 'text'}
-                          defaultValue={row[c.field] == null ? '' : String(row[c.field])}
-                          onBlur={(e) =>
-                            update(
-                              String(row.id),
-                              c.field,
-                              c.type === 'number'
-                                ? e.target.value === ''
-                                  ? null
-                                  : Number(e.target.value)
-                                : e.target.value,
-                            )
-                          }
-                        />
-                      )}
-                    </td>
-                  ))}
-                  <td className="td text-right">
-                    <button className="text-rose-600 hover:underline" onClick={() => remove(String(row.id))}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Section>
-  )
-}
+import { parseParentChildMap } from '../lib/excel'
+import { Empty, PageHeader, Section, Spinner } from '../components/ui'
+import DataGrid from '../components/DataGrid'
 
 function CostingConfigEditor() {
   const { data, loading, refresh } = useData<{ id: string; machine_cost_per_hour: number; labor_cost_per_hour: number } | null>(
@@ -176,7 +56,47 @@ export default function Config() {
     <div>
       <PageHeader title="Configuration" subtitle="Admin masters & rates. Changes save on blur." />
 
-      <MasterEditor
+      <DataGrid
+        title="Parent-Child Master"
+        subtitle="Maps a product (Parent ID) at a pack size to its child SKU. A blend is just rows entered under the blend's own Parent ID. Import appends/updates by (Parent ID, Size)."
+        table="parent_child_map"
+        orderBy="parent_code"
+        cols={[
+          { field: 'parent_code', label: 'Parent ID', type: 'text', width: 'max-w-[140px]' },
+          { field: 'parent_description', label: 'Parent Description', type: 'text' },
+          { field: 'category', label: 'Category', type: 'text', width: 'max-w-[140px]' },
+          { field: 'pack_size_g', label: 'Size (g)', type: 'number', width: 'max-w-[100px]' },
+          { field: 'child_code', label: 'Child ID', type: 'text', width: 'max-w-[140px]' },
+          { field: 'child_description', label: 'Child Description', type: 'text' },
+          { field: 'child_barcode', label: 'Child Barcode', type: 'text', width: 'max-w-[160px]' },
+          { field: 'active', label: 'Active', type: 'boolean' },
+        ]}
+        defaultRow={{
+          parent_code: '',
+          parent_description: '',
+          category: '',
+          pack_size_g: 100,
+          child_code: '',
+          child_description: '',
+          child_barcode: '',
+          active: true,
+        }}
+        onImport={parseParentChildMap}
+        importConflict="parent_code,pack_size_g"
+        templateHeaders={['Parent ID', 'Parent Description', 'Category', 'Size', 'Child ID', 'Child Description', 'Child Barcode']}
+        exportColumns={[
+          { header: 'Parent ID', field: 'parent_code' },
+          { header: 'Parent Description', field: 'parent_description' },
+          { header: 'Category', field: 'category' },
+          { header: 'Size', field: 'pack_size_g' },
+          { header: 'Child ID', field: 'child_code' },
+          { header: 'Child Description', field: 'child_description' },
+          { header: 'Child Barcode', field: 'child_barcode' },
+        ]}
+        fileBaseName="parent-child-master"
+      />
+
+      <DataGrid
         title="Employee Master"
         table="employees"
         orderBy="code"
@@ -188,7 +108,7 @@ export default function Config() {
         defaultRow={{ code: 'EMP000', name: 'New Operator', active: true }}
       />
 
-      <MasterEditor
+      <DataGrid
         title="Machine Master"
         table="machines"
         orderBy="code"
@@ -201,7 +121,7 @@ export default function Config() {
         defaultRow={{ code: 'Machine 5', name: 'Machine 5', active: true }}
       />
 
-      <MasterEditor
+      <DataGrid
         title="Pack Sizes"
         table="pack_sizes"
         orderBy="grams"
@@ -213,7 +133,7 @@ export default function Config() {
         defaultRow={{ grams: 500, label: '500g', active: true }}
       />
 
-      <MasterEditor
+      <DataGrid
         title="Wastage Reasons"
         table="wastage_reasons"
         orderBy="name"
@@ -224,7 +144,7 @@ export default function Config() {
         defaultRow={{ name: 'New Reason', active: true }}
       />
 
-      <MasterEditor
+      <DataGrid
         title="Packaging Cost (per pack size)"
         table="packaging_costs"
         orderBy="pack_size_g"

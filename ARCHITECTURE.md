@@ -5,7 +5,13 @@
 > behaviour, the cost model, conventions, or deployment. Add a line to the
 > [Iteration Log](#iteration-log) every time. If code and this doc disagree, the doc is wrong — fix it.
 
-Last updated: **2026-06-15**
+Last updated: **2026-06-19**
+
+> **Restructure in progress** (branch `restructure/multi-parent-blends`): re-basing the model on
+> **inputs-as-a-list (`job_parents`) + a declared output product (`parent_child_map`)**, with an
+> On-Hold lifecycle, snapshot-based dashboard, and accounts (5 phases — see Iteration Log).
+> New schema columns/tables are added **alongside** legacy ones so screens migrate phase-by-phase.
+> **Phase 1 done:** new data model + Parent-Child Master + editable Receipt grid.
 
 ---
 
@@ -53,14 +59,16 @@ src/
   types.ts                     DB row types (mirror schema.sql)
   index.css                    Tailwind + .btn/.card/.input/.th/.td component classes
   components/ui.tsx            PageHeader, Section, Stat, StatusBadge, Empty, Spinner, Banner
+  components/DataGrid.tsx      Reusable inline-edit grid: CRUD + Import/Template/Export (+deriveRow)
   lib/
     supabase.ts                Client + isSupabaseConfigured flag
     useData.ts                 useData(loader, deps) → {data, loading, error, refresh}
     cost.ts                    PURE cost engine (calculateCost, hoursBetween)
     cost.test.ts               Unit tests (consistency: Σ per-pack = total batch cost)
-    excel.ts                   parseParentWorkbook(), exportChildRecords()
+    excel.ts                   parseParentWorkbook/parseParentChildMap, downloadTemplate, exportRows, exportChildRecords
+    parent.ts                  parentRow()/parentTotalWeightG() — receipt derive + legacy mirror
     units.ts                   toGrams(), formatWeight()
-    codes.ts                   childItemCode/childBatchId/childDescription
+    codes.ts                   childItemCode/childBatchId/childDescription (fallback; map lookup preferred)
     format.ts                  money/pct/num/dateTime/dateOnly/shiftFromIso
   pages/
     Dashboard.tsx              KPIs + charts + variance tables (pure computeMetrics())
@@ -83,16 +91,20 @@ Defined in `supabase/schema.sql`. All ids are `uuid default gen_random_uuid()`.
 - `wastage_reasons` — `name` (unique), `active`
 - `costing_config` — singleton: `machine_cost_per_hour`, `labor_cost_per_hour`
 - `packaging_costs` — `pack_size_g` (unique), `cost_per_unit`
+- **`parent_child_map`** _(NEW — the Parent-Child Master)_ — `parent_code, parent_description, category, pack_size_g, child_code, child_description, child_barcode, active`; unique `(parent_code, pack_size_g)`. **Blends are rows under the blend's own `parent_code`.** Drives child-SKU identity (replaces generated codes).
 
 **Transactional:**
-- `parent_items` — Excel receipt: `item_code, description, unit('kg'|'g'), batch_id, quantity, expiry_date, unit_cost, total_value, warehouse_name, received_at`
-- `repack_jobs` — `parent_item_id→parent_items`, `machine_code`, `operator_code`, `status('Created'|'Processing'|'Completed')`, `shift`, `created_at`, `start_at`, `complete_at`
-- `job_pack_sizes` — `job_id→repack_jobs`, `pack_size_g`, `expected_packs`, `expected_output_g`, `actual_packs`, `actual_output_g`
-- `job_wastage` — `job_id→repack_jobs`, `reason`, `grams`
-- `child_skus` — generated: `job_id, parent_item_id, child_item_code, description, unit('pack'), batch_id, pack_size_g, quantity, expiry_date, unit_cost, total_value, warehouse_name, created_at`
+- `parent_items` — receipt. NEW: `category, qty (unit count), weight_per_unit, weight_unit('kg'|'g'), total_cost`, generated `total_weight_g`. **Legacy mirror kept** (`unit, quantity, unit_cost, total_value`) — `parent.ts::parentRow()` keeps them consistent (quantity = total grams, total_value = total_cost) so un-migrated screens still read correct weights/costs.
+- `repack_jobs` — NEW: `process_type('Machine'|'Manual')`, `output_product_code`, `active_seconds`; `machine_code` + `parent_item_id` now **nullable**; status adds **`'On Hold'`**.
+- **`job_parents`** _(NEW junction — inputs)_ — `job_id, parent_item_id, required_weight_g, material_cost`. Job input weight = Σ`required_weight_g`; material cost = Σ`material_cost`. "Parent Adjustments" = balance view over this.
+- **`job_time_events`** _(NEW)_ — `job_id, event_type('start'|'hold'|'resume'|'stop'), at` → active processing time.
+- `job_pack_sizes` — `actual_packs`/`actual_output_g` kept; `expected_*` retired (planned-output flow removed in Phase 2).
+- `job_wastage` — `job_id, reason, grams`.
+- `child_skus` — NEW: `category, child_barcode, output_product_code`; `parent_item_id` nullable. Identity from `parent_child_map` (Phase 2).
+- **`job_cost_snapshot`** _(NEW — scale)_ — frozen per-job result at "Generate Child SKUs"; the dashboard reads these instead of recomputing history.
 
-**Relationships:** `parent_items 1—N repack_jobs 1—N {job_pack_sizes, job_wastage, child_skus}`.
-All child FKs `on delete cascade`.
+**Relationships:** `repack_jobs 1—N {job_parents, job_time_events, job_pack_sizes, job_wastage, child_skus, job_cost_snapshot(1—1)}`.
+All child FKs `on delete cascade`. Indexes on status/dates/FKs for scale.
 
 **RLS:** every table has a single `open_all` policy (`using(true) with check(true)`) for anon+authenticated.
 
@@ -169,7 +181,7 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 - Keep calculation logic **pure** in `src/lib` and unit-tested; pages stay thin (fetch + render).
 - `types.ts` mirrors `schema.sql` exactly — change both together.
 - Money formatted via `format.ts` (no currency symbol — locale-agnostic).
-- New master/dropdown ⇒ add table + seed + RLS in `schema.sql`, a type in `types.ts`, and a `MasterEditor` block in `Config.tsx`.
+- New master/dropdown ⇒ add table + seed + RLS in `schema.sql`, a type in `types.ts`, and a `<DataGrid …/>` block in `Config.tsx`. `DataGrid` (replaces the old `MasterEditor`) is the reusable inline-edit grid; pass `onImport`/`templateHeaders`/`exportColumns` to enable Excel import/template/export, and `deriveRow` to keep computed/mirror columns consistent on save.
 
 ---
 
@@ -185,7 +197,7 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
-- **2026-06-15** — Dashboard trend chart changed from monthly to **daily** (aggregation key `YYYY-MM-DD`; "Daily Yield & QC Rejects").
+- **2026-06-19** — **Restructure Phase 1** (branch `restructure/multi-parent-blends`): new data model added alongside legacy (tables `parent_child_map`, `job_parents`, `job_time_events`, `job_cost_snapshot`; new columns on `parent_items`/`repack_jobs`/`child_skus`; `'On Hold'` status; indexes). New reusable **`DataGrid`** (CRUD + Import/Template/Export, supersedes `MasterEditor`). **Config** gains the **Parent-Child Master**. **Receipt** rebuilt as an inline-editable grid (import/template/export) with `parent.ts::parentRow()` deriving the legacy mirror. `excel.ts` generalized (`parseParentChildMap`, `downloadTemplate`, `exportRows`). Phases 2–5 (multi-parent job flow + On-Hold, Records split, new Dashboard, scale+auth) pending. _(plan: `~/.claude/plans/i-want-to-make-declarative-sunrise.md`)_
 - **2026-06-15** — Visual redesign: Inter font, brand teal scale + soft shadows, gradient body background, gradient buttons/brand marks, icon-chip stat cards, accent section headers, dotted status badges, polished nav active states.
 - **2026-06-15** — Mobile UX: app-style **bottom tab bar** + mobile top app bar (desktop keeps the sidebar); browse screens (Jobs, Records, Receipt) render as **cards on mobile**, tables on `md+`. `Stat` gained `valueClassName`.
 - **2026-06-15** — Dashboard now computes **live** via `calculateCost()` (not the `child_skus` snapshot) and reflects all `status='Completed'` jobs (dropped the child-SKU gate). Job-screen and dashboard numbers always agree now.

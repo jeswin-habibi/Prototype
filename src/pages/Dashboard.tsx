@@ -197,7 +197,7 @@ function computeMetrics(d: Bundle) {
       parentMaterialCost: Number(j.parent.total_value),
       inputWeightG: toGrams(j.parent.quantity, j.parent.unit),
       machineHours: hoursBetween(j.start_at, j.complete_at),
-      machineCostPerHour: machineByCode.get(j.machine_code)?.cost_per_hour_override ?? d.config.machine_cost_per_hour,
+      machineCostPerHour: machineByCode.get(j.machine_code ?? '')?.cost_per_hour_override ?? d.config.machine_cost_per_hour,
       laborCostPerHour: d.config.labor_cost_per_hour,
       packLines: lines.map((l) => ({
         packSizeG: Number(l.pack_size_g),
@@ -208,7 +208,7 @@ function computeMetrics(d: Bundle) {
     })
     return {
       res,
-      machine: j.machine_code,
+      machine: j.machine_code ?? '—',
       operator: j.operator_code,
       shift: j.shift ?? '—',
       day: (j.complete_at ?? j.created_at).slice(0, 10),

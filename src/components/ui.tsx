@@ -72,11 +72,13 @@ export function StatusBadge({ status }: { status: JobStatus }) {
   const cls = {
     Created: 'bg-slate-100 text-slate-600',
     Processing: 'bg-amber-100 text-amber-800',
+    'On Hold': 'bg-orange-100 text-orange-800',
     Completed: 'bg-emerald-100 text-emerald-700',
   }[status]
   const dot = {
     Created: 'bg-slate-400',
     Processing: 'bg-amber-500',
+    'On Hold': 'bg-orange-500',
     Completed: 'bg-emerald-500',
   }[status]
   return (
