@@ -234,7 +234,14 @@ function Cell({
 }) {
   const raw = row[col.field]
   const cls = mobile ? 'input w-full' : `input ${col.width ?? 'max-w-[180px]'}`
-  if (col.type === 'computed') return <span className="text-sm text-slate-700">{col.compute ? col.compute(row) : ''}</span>
+  if (col.type === 'computed') {
+    const content = col.compute ? col.compute(row) : ''
+    return mobile ? (
+      <span className="flex min-h-[38px] items-center rounded-lg bg-slate-100/70 px-3 text-sm font-medium text-slate-700 dark:bg-ink-900/50 dark:text-slate-200">{content}</span>
+    ) : (
+      <span className="text-sm text-slate-700 dark:text-slate-200">{content}</span>
+    )
+  }
   if (col.type === 'boolean')
     return <input type="checkbox" className="h-4 w-4" checked={Boolean(raw)} onChange={(e) => onSave(e.target.checked)} />
   if (col.type === 'select')

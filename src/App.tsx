@@ -3,6 +3,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { isSupabaseConfigured } from './lib/supabase'
 import { NavGuardProvider, useNavGuard } from './lib/navGuard'
 import { Banner, Spinner } from './components/ui'
+import { IconConfig, IconDashboard, IconJobs, IconMoon, IconReceipt, IconRecords, IconSun } from './components/icons'
 
 // Lazy-load pages so the heavy chart/xlsx code only loads when its screen is opened.
 // If a chunk fails to load — usually because a new deploy replaced the hashed file while
@@ -51,11 +52,11 @@ const Records = lazyWithRetry(() => import('./pages/Records'))
 const Config = lazyWithRetry(() => import('./pages/Config'))
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard', short: 'Home', icon: '📊' },
-  { to: '/receipt', label: 'Parent Receipt', short: 'Receipt', icon: '📥' },
-  { to: '/jobs', label: 'Repacking Jobs', short: 'Jobs', icon: '⚙️' },
-  { to: '/records', label: 'Records', short: 'Records', icon: '🧾' },
-  { to: '/config', label: 'Config', short: 'Config', icon: '🛠️' },
+  { to: '/dashboard', label: 'Dashboard', short: 'Home', Icon: IconDashboard },
+  { to: '/receipt', label: 'Parent Receipt', short: 'Receipt', Icon: IconReceipt },
+  { to: '/jobs', label: 'Repacking Jobs', short: 'Jobs', Icon: IconJobs },
+  { to: '/records', label: 'Records', short: 'Records', Icon: IconRecords },
+  { to: '/config', label: 'Config', short: 'Config', Icon: IconConfig },
 ]
 
 function useGuardedNav() {
@@ -68,8 +69,10 @@ function useGuardedNav() {
   }
 }
 
+type NavIcon = ComponentType<{ className?: string }>
+
 /** Desktop sidebar item (icon + full label). */
-function SideItem({ to, label, icon }: { to: string; label: string; icon: string }) {
+function SideItem({ to, label, Icon }: { to: string; label: string; Icon: NavIcon }) {
   const onClick = useGuardedNav()
   return (
     <NavLink
@@ -83,16 +86,14 @@ function SideItem({ to, label, icon }: { to: string; label: string; icon: string
         }`
       }
     >
-      <span className="text-lg" aria-hidden>
-        {icon}
-      </span>
+      <Icon className="h-5 w-5" />
       <span>{label}</span>
     </NavLink>
   )
 }
 
 /** Mobile bottom-tab item (icon stacked over short label). */
-function TabItem({ to, short, icon }: { to: string; short: string; icon: string }) {
+function TabItem({ to, short, Icon }: { to: string; short: string; Icon: NavIcon }) {
   const onClick = useGuardedNav()
   return (
     <NavLink
@@ -106,13 +107,8 @@ function TabItem({ to, short, icon }: { to: string; short: string; icon: string 
     >
       {({ isActive }) => (
         <>
-          <span
-            className={`flex h-7 w-12 items-center justify-center rounded-full text-lg leading-none transition ${
-              isActive ? 'bg-brand/20' : 'opacity-70'
-            }`}
-            aria-hidden
-          >
-            {icon}
+          <span className={`flex h-7 w-12 items-center justify-center rounded-full transition ${isActive ? 'bg-brand/20' : ''}`}>
+            <Icon className="h-[18px] w-[18px]" />
           </span>
           <span>{short}</span>
         </>
@@ -171,9 +167,9 @@ function AppShell() {
         <button
           onClick={toggleTheme}
           aria-label="Toggle dark mode"
-          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-base hover:bg-white/10"
+          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-white/80 hover:bg-white/10 hover:text-white"
         >
-          {theme === 'dark' ? '☀️' : '🌙'}
+          {theme === 'dark' ? <IconSun className="h-[18px] w-[18px]" /> : <IconMoon className="h-[18px] w-[18px]" />}
         </button>
       </header>
 
@@ -195,9 +191,10 @@ function AppShell() {
           <div className="mt-auto px-3 pb-5">
             <button
               onClick={toggleTheme}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white"
             >
-              {theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode'}
+              {theme === 'dark' ? <IconSun className="h-4 w-4" /> : <IconMoon className="h-4 w-4" />}
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
             </button>
           </div>
         </aside>

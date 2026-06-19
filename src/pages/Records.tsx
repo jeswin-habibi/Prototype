@@ -6,6 +6,7 @@ import { money, num } from '../lib/format'
 import { formatWeight } from '../lib/units'
 import type { ChildSku, JobParent, RepackJob } from '../types'
 import { Banner, Empty, PageHeader, Section, Spinner, SummaryBar } from '../components/ui'
+import { IconBox } from '../components/icons'
 
 type Tab = 'children' | 'adjustments'
 
@@ -36,21 +37,22 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   )
 }
 
-function Field({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <span className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-slate-400">
-        {icon && <span aria-hidden>{icon}</span>}
-        {label}
-      </span>
+      <span className="block text-[11px] uppercase tracking-wide text-slate-400">{label}</span>
       <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{children}</div>
     </div>
   )
 }
 
 /** Green icon chip on the left of a record card. */
-function Chip({ children }: { children: React.ReactNode }) {
-  return <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-base text-brand-700 dark:bg-brand/15 dark:text-brand-light">{children}</div>
+function Chip() {
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand/15 dark:text-brand-light">
+      <IconBox className="h-5 w-5" />
+    </div>
+  )
 }
 
 function ChildRecords() {
@@ -89,7 +91,7 @@ function ChildRecords() {
               <div key={r.id} className="rounded-xl border border-slate-200 border-l-[3px] border-l-brand bg-white p-3 shadow-soft dark:border-ink-700 dark:bg-ink-800">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
-                    <Chip>📦</Chip>
+                    <Chip />
                     <div className="min-w-0">
                       <div className="font-semibold text-slate-900 dark:text-white">{r.child_item_code}</div>
                       <div className="truncate text-xs text-slate-500 dark:text-slate-400">{r.description}</div>
@@ -229,7 +231,7 @@ function ParentAdjustments() {
                 <div key={r.id} className="rounded-xl border border-slate-200 border-l-[3px] border-l-brand bg-white p-3 shadow-soft dark:border-ink-700 dark:bg-ink-800">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <Chip>📦</Chip>
+                      <Chip />
                       <div className="min-w-0">
                         <div className="font-semibold text-slate-900 dark:text-white">{r.parent?.item_code}</div>
                         <div className="truncate text-xs text-slate-500 dark:text-slate-400">{r.parent?.description}</div>

@@ -135,6 +135,7 @@ export default function Dashboard() {
             <Kpi label="Wastage" value={`${num(Math.round(m.totalWastageKg))}kg`} />
             <Kpi label="Packs" value={compact(m.packsProduced)} />
             <Kpi label="Value" value={compact(m.outputValue)} />
+            <Kpi label="Cost/pk" value={money(m.packsProduced ? m.outputValue / m.packsProduced : 0, 2)} />
           </div>
 
           {/* Status pipeline — Created = total jobs; others = current status */}
@@ -151,7 +152,7 @@ export default function Dashboard() {
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-semibold transition ${tab === t ? 'bg-gradient-to-br from-brand-light to-brand text-white shadow-soft' : 'text-slate-600 hover:bg-slate-50'}`}
+                className={`flex-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[13px] font-semibold transition ${tab === t ? 'bg-gradient-to-br from-brand-light to-brand text-white shadow-soft' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-ink-700'}`}
               >
                 {t}
               </button>
