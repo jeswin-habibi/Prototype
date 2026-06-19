@@ -3,7 +3,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { isSupabaseConfigured } from './lib/supabase'
 import { NavGuardProvider, useNavGuard } from './lib/navGuard'
 import { Banner, Spinner } from './components/ui'
-import { IconConfig, IconDashboard, IconJobs, IconMoon, IconReceipt, IconRecords, IconSun } from './components/icons'
+import { IconClipboard, IconGear, IconHome, IconMoon, IconReceipt, IconRecords, IconSun } from './components/icons'
 
 // Lazy-load pages so the heavy chart/xlsx code only loads when its screen is opened.
 // If a chunk fails to load — usually because a new deploy replaced the hashed file while
@@ -52,11 +52,11 @@ const Records = lazyWithRetry(() => import('./pages/Records'))
 const Config = lazyWithRetry(() => import('./pages/Config'))
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard', short: 'Home', Icon: IconDashboard },
+  { to: '/dashboard', label: 'Dashboard', short: 'Home', Icon: IconHome },
   { to: '/receipt', label: 'Parent Receipt', short: 'Receipt', Icon: IconReceipt },
-  { to: '/jobs', label: 'Repacking Jobs', short: 'Jobs', Icon: IconJobs },
+  { to: '/jobs', label: 'Repacking Jobs', short: 'Jobs', Icon: IconClipboard },
   { to: '/records', label: 'Records', short: 'Records', Icon: IconRecords },
-  { to: '/config', label: 'Config', short: 'Config', Icon: IconConfig },
+  { to: '/config', label: 'Config', short: 'Config', Icon: IconGear },
 ]
 
 function useGuardedNav() {

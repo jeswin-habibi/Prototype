@@ -26,10 +26,10 @@ export default {
         },
         // Chrome — dark navy (header, sidebar, bottom nav, totals bar; also dark-mode surfaces)
         ink: {
-          700: '#1c2c47',
-          800: '#152138',
-          900: '#0f1b2e',
-          950: '#0a1320',
+          700: '#243044', // borders / dividers
+          800: '#121a28', // elevated surfaces (cards)
+          900: '#0d141f', // chrome (header / nav)
+          950: '#080d15', // page background
         },
       },
       boxShadow: {

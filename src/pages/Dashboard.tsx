@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
@@ -7,6 +7,25 @@ import { useData } from '../lib/useData'
 import { money, num, pct } from '../lib/format'
 import type { JobCostSnapshot, JobStatus, ProcessType } from '../types'
 import { Empty, PageHeader, Section, Spinner } from '../components/ui'
+import { IconBox, IconCheckCircle, IconCoins, IconExport, IconGear, IconImport, IconPause, IconRecords, IconTrash, IconTrendUp, IconWeight } from '../components/icons'
+
+// Re-render charts/colors when the dark class toggles.
+function useIsDark() {
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
+  useEffect(() => {
+    const obs = new MutationObserver(() => setDark(document.documentElement.classList.contains('dark')))
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+  return dark
+}
+const chartColors = (dark: boolean) => ({
+  grid: dark ? '#1e2a3d' : '#eef2f7',
+  axis: dark ? '#94a3b8' : '#64748b',
+  tooltip: dark
+    ? { backgroundColor: '#0d141f', border: '1px solid #243044', borderRadius: 10, color: '#e2e8f0' }
+    : { borderRadius: 10, border: '1px solid #e2e8f0' },
+})
 
 const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6', '#ec4899', '#22c55e']
 
@@ -34,6 +53,8 @@ export default function Dashboard() {
   const [drillOutput, setDrillOutput] = useState<number | null>(null)
   const [drillCost, setDrillCost] = useState<number | null>(null)
   const [drillWasteReason, setDrillWasteReason] = useState<string | null>(null)
+  const dark = useIsDark()
+  const cc = chartColors(dark)
 
   const { data, loading } = useData<Bundle>(async () => {
     const range = <T extends { gte: (c: string, v: string) => T; lte: (c: string, v: string) => T }>(q: T, col: string, hiSuffix = '') => {
@@ -89,13 +110,13 @@ export default function Dashboard() {
       {!m || m.trend.length === 0 ? <Empty>No completed jobs in range.</Empty> : (
         <ResponsiveContainer width="100%" height={230}>
           <LineChart data={m.trend} margin={{ left: -10, right: 8, top: 4 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
-            <XAxis dataKey="key" tick={{ fontSize: 11 }} />
-            <YAxis yAxisId="l" tick={{ fontSize: 11 }} />
-            <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 11 }} />
-            <Tooltip />
-            <Legend />
-            <Line yAxisId="l" type="monotone" dataKey="outputKg" name="Output (kg)" stroke="#0f766e" strokeWidth={2.5} dot={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={cc.grid} />
+            <XAxis dataKey="key" tick={{ fontSize: 11, fill: cc.axis }} />
+            <YAxis yAxisId="l" tick={{ fontSize: 11, fill: cc.axis }} />
+            <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 11, fill: cc.axis }} />
+            <Tooltip contentStyle={cc.tooltip} labelStyle={{ color: cc.axis }} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Line yAxisId="l" type="monotone" dataKey="outputKg" name="Output (kg)" stroke="#14b8a6" strokeWidth={2.5} dot={false} />
             <Line yAxisId="r" type="monotone" dataKey="yield" name="Yield %" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
           </LineChart>
         </ResponsiveContainer>
@@ -127,23 +148,28 @@ export default function Dashboard() {
       ) : (
         <>
           {/* Compact KPI tiles — 4-up, dense, abbreviated values */}
-          <div className="mb-3 grid grid-cols-4 gap-1.5 sm:gap-2">
-            <Kpi label="In (kg)" value={num(Math.round(m.inputKg))} />
-            <Kpi label="Out (kg)" value={num(Math.round(m.outputKg))} />
-            <Kpi label="Yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
-            <Kpi label="Waste" value={pct(m.avgWastePct)} tone={m.avgWastePct <= 5 ? 'good' : 'warn'} />
-            <Kpi label="Wastage" value={`${num(Math.round(m.totalWastageKg))}kg`} />
-            <Kpi label="Packs" value={compact(m.packsProduced)} />
-            <Kpi label="Value" value={compact(m.outputValue)} />
-            <Kpi label="Cost/pk" value={money(m.packsProduced ? m.outputValue / m.packsProduced : 0, 2)} />
+          <div className="mb-3 grid grid-cols-4 gap-2">
+            <Kpi accent="teal" Icon={IconImport} label="In (kg)" value={num(Math.round(m.inputKg))} />
+            <Kpi accent="blue" Icon={IconExport} label="Out (kg)" value={num(Math.round(m.outputKg))} />
+            <Kpi accent="green" Icon={IconTrendUp} label="Yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
+            <Kpi accent="amber" Icon={IconTrash} label="Waste" value={pct(m.avgWastePct)} tone={m.avgWastePct <= 5 ? 'good' : 'warn'} />
+            <Kpi accent="purple" Icon={IconWeight} label="Wastage" value={`${num(Math.round(m.totalWastageKg))}kg`} />
+            <Kpi accent="blue" Icon={IconBox} label="Packs" value={compact(m.packsProduced)} />
+            <Kpi accent="amber" Icon={IconCoins} label="Value" value={compact(m.outputValue)} unit="KWD" />
+            <Kpi accent="teal" Icon={IconCheckCircle} label="Done" value={num(m.statusCounts.Completed)} tone="good" />
           </div>
 
-          {/* Status pipeline — Created = total jobs; others = current status */}
-          <div className="mb-4 flex divide-x divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-soft">
-            <Pipe label="Created" n={m.statusCounts.Created + m.statusCounts.Processing + m.statusCounts['On Hold'] + m.statusCounts.Completed} />
-            <Pipe label="Processing" n={m.statusCounts.Processing} tone="text-amber-600" />
-            <Pipe label="On Hold" n={m.statusCounts['On Hold']} tone="text-orange-600" />
-            <Pipe label="Completed" n={m.statusCounts.Completed} tone="text-emerald-600" />
+          {/* Job pipeline — highlighted panel; Created = total jobs, others = current status */}
+          <div className="mb-4 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand-50/60 to-white p-3 shadow-card dark:border-brand/25 dark:from-brand/10 dark:to-ink-800">
+            <div className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-200">
+              <span className="h-3.5 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" /> Job Pipeline
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <Pipe label="Created" n={m.statusCounts.Created + m.statusCounts.Processing + m.statusCounts['On Hold'] + m.statusCounts.Completed} accent="slate" Icon={IconRecords} />
+              <Pipe label="Processing" n={m.statusCounts.Processing} accent="amber" Icon={IconGear} />
+              <Pipe label="On Hold" n={m.statusCounts['On Hold']} accent="rose" Icon={IconPause} />
+              <Pipe label="Completed" n={m.statusCounts.Completed} accent="emerald" Icon={IconCheckCircle} />
+            </div>
           </div>
 
           {/* Tab bar */}
@@ -217,7 +243,7 @@ export default function Dashboard() {
                         >
                           {m.wastageByReason.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
-                        <Tooltip formatter={(v: number) => `${num(v)} g`} />
+                        <Tooltip contentStyle={cc.tooltip} formatter={(v: number) => `${num(v)} g`} />
                         <Legend wrapperStyle={{ fontSize: 11 }} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -244,12 +270,37 @@ export default function Dashboard() {
   )
 }
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'bad' }) {
-  const t = tone === 'good' ? 'text-emerald-600' : tone === 'warn' ? 'text-amber-600' : tone === 'bad' ? 'text-rose-600' : 'text-slate-900'
+const KPI_ACCENT = {
+  teal: 'bg-teal-500/15 text-teal-600 dark:text-teal-400',
+  blue: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+  green: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  amber: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  purple: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+}
+const KPI_TONE = {
+  default: 'text-slate-900 dark:text-white',
+  good: 'text-emerald-600 dark:text-emerald-400',
+  warn: 'text-amber-600 dark:text-amber-400',
+  bad: 'text-rose-600 dark:text-rose-400',
+}
+function Kpi({ Icon, accent = 'teal', label, value, tone = 'default', unit }: {
+  Icon: ComponentType<{ className?: string }>
+  accent?: keyof typeof KPI_ACCENT
+  label: string
+  value: ReactNode
+  tone?: keyof typeof KPI_TONE
+  unit?: string
+}) {
   return (
-    <div className="rounded-lg border border-slate-200/70 bg-white px-2 py-1.5 shadow-soft">
-      <div className="truncate text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className={`truncate text-[13px] font-extrabold leading-tight sm:text-base ${t}`}>{value}</div>
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-2.5 shadow-soft dark:border-ink-700/60 dark:bg-ink-800">
+      <div className={`mb-2 flex h-8 w-8 items-center justify-center rounded-full ${KPI_ACCENT[accent]}`}>
+        <Icon className="h-[18px] w-[18px]" />
+      </div>
+      <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className={`truncate text-[15px] font-extrabold leading-tight sm:text-lg ${KPI_TONE[tone]}`}>
+        {value}
+        {unit && <span className="ml-0.5 text-[10px] font-semibold text-slate-400">{unit}</span>}
+      </div>
     </div>
   )
 }
@@ -260,11 +311,24 @@ function compact(n: number): string {
   return `${Math.round(n)}`
 }
 
-function Pipe({ label, n, tone = 'text-slate-700' }: { label: string; n: number; tone?: string }) {
+const PIPE_TEXT = {
+  slate: 'text-slate-900 dark:text-white',
+  amber: 'text-amber-600 dark:text-amber-400',
+  rose: 'text-rose-600 dark:text-rose-400',
+  emerald: 'text-emerald-600 dark:text-emerald-400',
+}
+const PIPE_BG = {
+  slate: 'bg-white/70 dark:bg-ink-900/40',
+  amber: 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/20',
+  rose: 'bg-rose-500/10 ring-1 ring-inset ring-rose-500/20',
+  emerald: 'bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/25',
+}
+function Pipe({ label, n, accent, Icon }: { label: string; n: number; accent: keyof typeof PIPE_TEXT; Icon: ComponentType<{ className?: string }> }) {
   return (
-    <div className="flex-1 px-2 py-2 text-center">
+    <div className={`relative overflow-hidden rounded-xl p-2.5 ${PIPE_BG[accent]}`}>
       <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className={`text-lg font-extrabold ${tone}`}>{num(n)}</div>
+      <div className={`text-xl font-extrabold ${PIPE_TEXT[accent]}`}>{num(n)}</div>
+      <Icon className={`absolute bottom-2 right-2 h-4 w-4 opacity-50 ${PIPE_TEXT[accent]}`} />
     </div>
   )
 }
@@ -302,14 +366,15 @@ function Bars({
   data: Record<string, unknown>[]; xKey: string; yKey: string; yLabel: string; money?: boolean
   onBarClick?: (entry: Record<string, unknown>) => void
 }) {
+  const cc = chartColors(useIsDark())
   if (data.length === 0) return <Empty>No data in range.</Empty>
   return (
     <ResponsiveContainer width="100%" height={230}>
       <BarChart data={data} margin={{ left: -12, right: 8, top: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
-        <XAxis dataKey={xKey} tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={54} tickFormatter={(v: string) => (String(v).length > 12 ? `${String(v).slice(0, 11)}…` : String(v))} />
-        <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v: number) => (isMoney ? money(v, 4) : `${num(v)} ${yLabel}`)} />
+        <CartesianGrid strokeDasharray="3 3" stroke={cc.grid} />
+        <XAxis dataKey={xKey} tick={{ fontSize: 10, fill: cc.axis }} interval={0} angle={-20} textAnchor="end" height={54} tickFormatter={(v: string) => (String(v).length > 12 ? `${String(v).slice(0, 11)}…` : String(v))} />
+        <YAxis tick={{ fontSize: 11, fill: cc.axis }} />
+        <Tooltip contentStyle={cc.tooltip} labelStyle={{ color: cc.axis }} formatter={(v: number) => (isMoney ? money(v, 4) : `${num(v)} ${yLabel}`)} />
         <Bar dataKey={yKey} radius={[4, 4, 0, 0]} cursor={onBarClick ? 'pointer' : undefined}
           onClick={onBarClick ? (e: unknown) => onBarClick((e as { payload: Record<string, unknown> }).payload) : undefined}>
           {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}

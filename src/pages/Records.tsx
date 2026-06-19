@@ -6,7 +6,7 @@ import { money, num } from '../lib/format'
 import { formatWeight } from '../lib/units'
 import type { ChildSku, JobParent, RepackJob } from '../types'
 import { Banner, Empty, PageHeader, Section, Spinner, SummaryBar } from '../components/ui'
-import { IconBox } from '../components/icons'
+import { IconBox, IconCoins, IconImport, IconRecords, IconWeight } from '../components/icons'
 
 type Tab = 'children' | 'adjustments'
 
@@ -156,10 +156,10 @@ function ChildRecords() {
 
           <SummaryBar
             items={[
-              { icon: '🏷️', label: 'Child SKUs', value: num(cd.length) },
-              { icon: '🧮', label: 'Total Packs', value: num(cd.reduce((s, r) => s + Number(r.quantity), 0)) },
-              { icon: '💰', label: 'Total Value', value: money(cd.reduce((s, r) => s + Number(r.total_value), 0)) },
-              { icon: '⚖️', label: 'Pack Sizes', value: num(new Set(cd.map((r) => Number(r.pack_size_g))).size) },
+              { icon: <IconRecords className="h-4 w-4" />, label: 'Child SKUs', value: num(cd.length) },
+              { icon: <IconBox className="h-4 w-4" />, label: 'Total Packs', value: num(cd.reduce((s, r) => s + Number(r.quantity), 0)) },
+              { icon: <IconCoins className="h-4 w-4" />, label: 'Total Value', value: money(cd.reduce((s, r) => s + Number(r.total_value), 0)), sub: 'KWD' },
+              { icon: <IconWeight className="h-4 w-4" />, label: 'Pack Sizes', value: num(new Set(cd.map((r) => Number(r.pack_size_g))).size) },
             ]}
           />
         </>
@@ -286,10 +286,10 @@ function ParentAdjustments() {
 
           <SummaryBar
             items={[
-              { icon: '📋', label: 'Adjustments', value: num(ad.length) },
-              { icon: '⚖️', label: 'Total Balance', value: tonnes(totalBalance) },
-              { icon: '⬇️', label: 'Total Drawn', value: tonnes(totalDrawn) },
-              { icon: '💰', label: 'Materials Cost', value: money(totalCost) },
+              { icon: <IconRecords className="h-4 w-4" />, label: 'Adjustments', value: num(ad.length) },
+              { icon: <IconWeight className="h-4 w-4" />, label: 'Total Balance', value: tonnes(totalBalance) },
+              { icon: <IconImport className="h-4 w-4" />, label: 'Total Drawn', value: tonnes(totalDrawn) },
+              { icon: <IconCoins className="h-4 w-4" />, label: 'Materials Cost', value: money(totalCost), sub: 'KWD' },
             ]}
           />
         </>

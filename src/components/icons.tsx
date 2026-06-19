@@ -84,3 +84,109 @@ export function IconBox({ className }: P) {
     </svg>
   )
 }
+
+export function IconImport({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M12 3v11" />
+      <path d="M8 10l4 4 4-4" />
+      <path d="M5 20h14" />
+    </svg>
+  )
+}
+
+export function IconExport({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M12 21V10" />
+      <path d="M8 14l4-4 4 4" />
+      <path d="M5 4h14" />
+    </svg>
+  )
+}
+
+export function IconTrendUp({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M22 7l-8.5 8.5-5-5L2 17" />
+      <path d="M16 7h6v6" />
+    </svg>
+  )
+}
+
+export function IconTrash({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  )
+}
+
+export function IconWeight({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <circle cx="12" cy="6" r="2.2" />
+      <path d="M7 9h10l1.6 11.2a1 1 0 0 1-1 1.2H6.4a1 1 0 0 1-1-1.2L7 9z" />
+    </svg>
+  )
+}
+
+export function IconCoins({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <ellipse cx="12" cy="6" rx="7" ry="3" />
+      <path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6" />
+      <path d="M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6" />
+    </svg>
+  )
+}
+
+export function IconCheckCircle({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12l3 3 5-6" />
+    </svg>
+  )
+}
+
+export function IconGear({ className }: P) {
+  return (
+    <svg {...svg(className)} strokeWidth={1.6}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+}
+
+export function IconPause({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 9v6M14 9v6" />
+    </svg>
+  )
+}
+
+export function IconHome({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M3 11l9-8 9 8" />
+      <path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10" />
+      <path d="M9 21v-6h6v6" />
+    </svg>
+  )
+}
+
+export function IconClipboard({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="3" width="8" height="4" rx="1" />
+      <path d="M9 12h6M9 16h6" />
+    </svg>
+  )
+}
