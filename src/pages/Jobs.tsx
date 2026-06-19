@@ -395,7 +395,12 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => { setOpen(false); setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 250) }}
+                onClick={() => {
+                  setOpen(false)
+                  ;(document.activeElement as HTMLElement | null)?.blur() // close the keyboard first
+                  setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 350)
+                  setTimeout(() => window.scrollTo({ top: 0 }), 700) // ensure it lands at the very top
+                }}
               >
                 Done
               </button>
