@@ -231,8 +231,8 @@ function AppShell() {
       {/* Mobile bottom nav — floating dark bar; hidden while typing so the keyboard doesn't push it over content */}
       {!keyboardOpen && (
         <nav
-          className="fixed inset-x-3 z-20 grid grid-cols-5 rounded-2xl bg-ink-900 shadow-lift md:hidden"
-          style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+          className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-ink-700 bg-ink-900 md:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {NAV.map((n) => (
             <TabItem key={n.to} {...n} />
