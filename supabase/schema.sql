@@ -236,3 +236,31 @@ begin
     );
   end loop;
 end $$;
+
+-- ───────────────────────────── Atomic parent consumption ─────────────────────────────
+-- Locks the parent row, checks remaining weight, and inserts the job_parents draw in one
+-- transaction so two operators can't over-draw the same parent concurrently.
+-- The app calls this RPC and falls back to a plain insert if it isn't deployed yet.
+create or replace function consume_parent(p_job_id uuid, p_parent_id uuid, p_weight_g numeric)
+returns numeric
+language plpgsql
+as $$
+declare
+  v_total numeric;
+  v_cpg numeric;
+  v_used numeric;
+begin
+  select total_weight_g, case when total_weight_g > 0 then total_cost / total_weight_g else 0 end
+    into v_total, v_cpg
+  from parent_items where id = p_parent_id for update;
+  if v_total is null then raise exception 'parent % not found', p_parent_id; end if;
+  select coalesce(sum(required_weight_g), 0) into v_used from job_parents where parent_item_id = p_parent_id;
+  if p_weight_g > v_total - v_used + 1e-6 then
+    raise exception 'insufficient stock for parent %: requested %g, remaining %g', p_parent_id, p_weight_g, v_total - v_used;
+  end if;
+  insert into job_parents (job_id, parent_item_id, required_weight_g, material_cost)
+    values (p_job_id, p_parent_id, p_weight_g, p_weight_g * v_cpg);
+  return v_total - v_used - p_weight_g;
+end;
+$$;
+grant execute on function consume_parent(uuid, uuid, numeric) to anon, authenticated;

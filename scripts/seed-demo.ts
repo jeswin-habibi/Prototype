@@ -60,28 +60,31 @@ await ins('packaging_costs', SIZES.map((g) => ({ pack_size_g: g, cost_per_unit: 
 
 // ─────────────────────────── 3. Products & Parent-Child Master ───────────────────────────
 // Parent ID + Child ID are alphanumeric SKU codes; the descriptive name lives in the description.
+// Parent IDs are numeric item codes; child IDs are `${parentId}-C${n}` (n = size index).
+const CSHW = '1000123', ALMD = '1000231', PSTA = '1000345', WLNT = '1000456', RAIS = '1000567', APRC = '1000678', TRMX = '1000801', NTMX = '1000902'
 interface Product { code: string; name: string; cat: string; bagKg: number; costKg: number; sizes: number[]; blendOf?: string[] }
 const PRODUCTS: Product[] = [
-  { code: 'CSHW32', name: 'Cashew Nuts W320', cat: 'Nuts', bagKg: 25, costKg: 8.2, sizes: [100, 250, 500] },
-  { code: 'ALMND', name: 'Almonds Nonpareil', cat: 'Nuts', bagKg: 25, costKg: 7.1, sizes: [100, 250, 500] },
-  { code: 'PSTAC', name: 'Pistachios Roasted & Salted', cat: 'Nuts', bagKg: 22, costKg: 13.5, sizes: [100, 250] },
-  { code: 'WLNUT', name: 'Walnut Halves', cat: 'Nuts', bagKg: 20, costKg: 9.4, sizes: [250, 500] },
-  { code: 'RAISG', name: 'Golden Raisins', cat: 'Dried Fruit', bagKg: 12.5, costKg: 2.9, sizes: [250, 500, 1000] },
-  { code: 'APRCT', name: 'Turkish Apricots', cat: 'Dried Fruit', bagKg: 10, costKg: 5.6, sizes: [250, 500] },
-  { code: 'TRLMX', name: 'Premium Trail Mix', cat: 'Mixes', bagKg: 0, costKg: 0, sizes: [100, 250, 500], blendOf: ['CSHW32', 'ALMND', 'RAISG'] },
-  { code: 'NUTMX', name: 'Deluxe Nut Mix', cat: 'Mixes', bagKg: 0, costKg: 0, sizes: [250, 500], blendOf: ['CSHW32', 'ALMND', 'WLNUT', 'PSTAC'] },
+  { code: CSHW, name: 'Cashew Nuts W320', cat: 'Nuts', bagKg: 25, costKg: 8.2, sizes: [100, 250, 500] },
+  { code: ALMD, name: 'Almonds Nonpareil', cat: 'Nuts', bagKg: 25, costKg: 7.1, sizes: [100, 250, 500] },
+  { code: PSTA, name: 'Pistachios Roasted & Salted', cat: 'Nuts', bagKg: 22, costKg: 13.5, sizes: [100, 250] },
+  { code: WLNT, name: 'Walnut Halves', cat: 'Nuts', bagKg: 20, costKg: 9.4, sizes: [250, 500] },
+  { code: RAIS, name: 'Golden Raisins', cat: 'Dried Fruit', bagKg: 12.5, costKg: 2.9, sizes: [250, 500, 1000] },
+  { code: APRC, name: 'Turkish Apricots', cat: 'Dried Fruit', bagKg: 10, costKg: 5.6, sizes: [250, 500] },
+  { code: TRMX, name: 'Premium Trail Mix', cat: 'Mixes', bagKg: 0, costKg: 0, sizes: [100, 250, 500], blendOf: [CSHW, ALMD, RAIS] },
+  { code: NTMX, name: 'Deluxe Nut Mix', cat: 'Mixes', bagKg: 0, costKg: 0, sizes: [250, 500], blendOf: [CSHW, ALMD, WLNT, PSTA] },
 ]
 const byCode: Record<string, Product> = Object.fromEntries(PRODUCTS.map((p) => [p.code, p]))
 
 let barcode = 8_901_234_500_001
 const mapRows: any[] = []
 for (const p of PRODUCTS)
-  for (const s of p.sizes)
+  p.sizes.forEach((s, idx) =>
     mapRows.push({
       parent_code: p.code, parent_description: p.name, category: p.cat, pack_size_g: s,
-      child_code: `${p.code}-${s}`, child_description: `${p.name} ${sizeLabel(s)} Pack`,
+      child_code: `${p.code}-C${idx + 1}`, child_description: `${p.name} ${sizeLabel(s)} Pack`,
       child_barcode: String(barcode++), active: true,
-    })
+    }),
+  )
 await ins('parent_child_map', mapRows)
 const { data: MAP } = await supabase.from('parent_child_map').select('*')
 
@@ -211,7 +214,7 @@ console.log(`Seeding ${N} completed jobs across ~6 months…`)
 for (let i = 0; i < N; i++) {
   const whenMs = now - Math.round((i + 0.5) * (175 / N)) * DAY + ((i % 4) - 2) * 3_600_000
   const isBlend = i % 7 === 3
-  const output = isBlend ? (i % 14 === 3 ? 'NUTMX' : 'TRLMX') : SINGLES[i % SINGLES.length]
+  const output = isBlend ? (i % 14 === 3 ? NTMX : TRMX) : SINGLES[i % SINGLES.length]
   const prod = byCode[output]
   const size = prod.sizes[i % prod.sizes.length]
   const processType: 'Machine' | 'Manual' = i % 9 < 5 ? 'Manual' : 'Machine'
@@ -254,9 +257,9 @@ async function simpleJob(status: string, opts: { processType: 'Machine' | 'Manua
   if (status !== 'Created') await ins('job_time_events', [{ job_id: job.id, event_type: 'start', at: iso(startMs) }])
   if (opts.held) await ins('job_time_events', [{ job_id: job.id, event_type: 'hold', at: iso(startMs + 20 * 60_000) }])
 }
-await simpleJob('Created', { processType: 'Machine', machine: 'MC-02', operator: 'EMP07', output: 'CSHW32', inputs: [{ code: 'CSHW32', batch: chooseBatch('CSHW32').batch_id, grams: 25000 }] })
-await simpleJob('Processing', { processType: 'Machine', machine: 'MC-03', operator: 'EMP08', output: 'ALMND', inputs: [{ code: 'ALMND', batch: chooseBatch('ALMND').batch_id, grams: 30000 }], startedMinAgo: 75 })
-await simpleJob('On Hold', { processType: 'Manual', operator: 'EMP09', output: 'RAISG', inputs: [{ code: 'RAISG', batch: chooseBatch('RAISG').batch_id, grams: 22000 }], startedMinAgo: 95, held: true })
+await simpleJob('Created', { processType: 'Machine', machine: 'MC-02', operator: 'EMP07', output: CSHW, inputs: [{ code: CSHW, batch: chooseBatch(CSHW).batch_id, grams: 25000 }] })
+await simpleJob('Processing', { processType: 'Machine', machine: 'MC-03', operator: 'EMP08', output: ALMD, inputs: [{ code: ALMD, batch: chooseBatch(ALMD).batch_id, grams: 30000 }], startedMinAgo: 75 })
+await simpleJob('On Hold', { processType: 'Manual', operator: 'EMP09', output: RAIS, inputs: [{ code: RAIS, batch: chooseBatch(RAIS).batch_id, grams: 22000 }], startedMinAgo: 95, held: true })
 
 // ─────────────────────────── 7. Scenario assertions ───────────────────────────
 console.log('\n──────── SCENARIO TESTS ────────')
@@ -292,7 +295,7 @@ const holdJobIds = new Set(allEvents.filter((e) => e.event_type === 'hold').map(
 const completedHolds = completedJobs.filter((j) => holdJobIds.has(j.id))
 check('On-Hold excluded from active time (active < wall-clock)', completedHolds.length > 0 && completedHolds.every((j) => Number(j.active_seconds) < (new Date(j.complete_at).getTime() - new Date(j.start_at).getTime()) / 1000 - 1), `${completedHolds.length} held`)
 
-const blendSnaps = allSnaps.filter((s) => ['TRLMX', 'NUTMX'].includes(s.output_product_code))
+const blendSnaps = allSnaps.filter((s) => [TRMX, NTMX].includes(s.output_product_code))
 let blendOk = blendSnaps.length > 0
 for (const s of blendSnaps) {
   const kids = allChildren.filter((c) => c.job_id === s.job_id)

@@ -182,6 +182,9 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
   }, [refData])
 
   const remainingG = (p: ParentItem) => Number(p.total_weight_g) - (refData?.consumed[p.id] ?? 0)
+  // FEFO: warn if an earlier-expiry batch of the same product still has stock.
+  const fefoWarn = (p: ParentItem) =>
+    (refData?.parents ?? []).some((o) => o.item_code === p.item_code && o.id !== p.id && remainingG(o) > 0 && !!o.expiry_date && !!p.expiry_date && o.expiry_date < p.expiry_date)
 
   const selectedEntries = Object.entries(selected).filter(([, w]) => Number(w) > 0)
   const selectedCodes = [...new Set(selectedEntries.map(([pid]) => parentsById[pid]?.item_code).filter(Boolean))]
@@ -218,7 +221,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
     for (const [pid, w] of selectedEntries) {
       const p = parentsById[pid]
       const rem = remainingG(p)
-      if (Number(w) > rem + 1e-6) return setError(`Weight drawn from ${p.item_code} (${Number(w)}g) exceeds remaining ${formatWeight(rem)}.`)
+      if (Number(w) * 1000 > rem + 1e-6) return setError(`Weight drawn from ${p.item_code} (${Number(w)} kg) exceeds remaining ${formatWeight(rem)}.`)
     }
     setBusy(true)
     const primary = selectedEntries[0][0]
@@ -235,15 +238,21 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
       .select('id')
       .single()
     if (e1 || !job) { setBusy(false); return setError(e1?.message ?? 'Failed to create job.') }
-    const rows = selectedEntries.map(([pid, w]) => {
+    // Consume each parent atomically (locks the row, re-checks remaining). Falls back to a
+    // plain insert if the consume_parent function isn't deployed yet (PostgREST code PGRST202).
+    for (const [pid, w] of selectedEntries) {
       const p = parentsById[pid]
-      const grams = Number(w)
+      const grams = Number(w) * 1000
       const cpg = Number(p.total_weight_g) > 0 ? Number(p.total_cost) / Number(p.total_weight_g) : 0
-      return { job_id: job.id, parent_item_id: pid, required_weight_g: grams, material_cost: grams * cpg }
-    })
-    const { error: e2 } = await supabase.from('job_parents').insert(rows)
+      const { error: rpcErr } = await supabase.rpc('consume_parent', { p_job_id: job.id, p_parent_id: pid, p_weight_g: grams })
+      if (rpcErr) {
+        if (rpcErr.code === 'PGRST202') {
+          const { error: insErr } = await supabase.from('job_parents').insert({ job_id: job.id, parent_item_id: pid, required_weight_g: grams, material_cost: grams * cpg })
+          if (insErr) { setBusy(false); return setError(insErr.message) }
+        } else { setBusy(false); return setError(rpcErr.message) }
+      }
+    }
     setBusy(false)
-    if (e2) return setError(e2.message)
     onCreated(job.id)
   }
 
@@ -310,7 +319,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
                 <th className="th">Qty</th>
                 <th className="th">Remaining</th>
                 <th className="th">Expiry</th>
-                <th className="th">Draw (g)</th>
+                <th className="th">Draw (kg)</th>
               </tr>
             </thead>
             <tbody>
@@ -332,14 +341,18 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
                       <td className="td">{dateOnly(p.expiry_date)}</td>
                       <td className="td">
                         {checked && (
-                          <input
-                            className="input max-w-[110px]"
-                            type="number"
-                            value={selected[p.id]}
-                            max={rem}
-                            placeholder={`≤ ${Math.floor(rem)}`}
-                            onChange={(e) => setWeight(p.id, e.target.value)}
-                          />
+                          <div>
+                            <input
+                              className="input max-w-[110px]"
+                              type="number"
+                              step="0.1"
+                              value={selected[p.id]}
+                              max={rem / 1000}
+                              placeholder={`≤ ${(rem / 1000).toFixed(1)}`}
+                              onChange={(e) => setWeight(p.id, e.target.value)}
+                            />
+                            {fefoWarn(p) && <div className="mt-1 text-[11px] font-medium text-amber-600">⚠ Earlier-expiry batch in stock</div>}
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -369,7 +382,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
         </div>
         <div className="self-end text-sm text-slate-500">
           {selectedEntries.length > 0 && (
-            <span>{selectedEntries.length} parent(s), drawing {formatWeight(selectedEntries.reduce((s, [, w]) => s + (Number(w) || 0), 0))}.</span>
+            <span>{selectedEntries.length} parent(s), drawing {formatWeight(selectedEntries.reduce((s, [, w]) => s + (Number(w) || 0) * 1000, 0))}.</span>
           )}
         </div>
       </div>

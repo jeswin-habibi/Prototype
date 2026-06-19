@@ -144,6 +144,10 @@ export default function JobDetail() {
   const totalPacks = data.lines.reduce((s, l) => s + Number(l.actual_packs ?? 0), 0)
   const addedSizes = new Set(data.lines.map((l) => Number(l.pack_size_g)))
   const availableSizes = data.packSizes.filter((p) => !addedSizes.has(Number(p.grams)))
+  const unmappedSizes = status === 'Completed'
+    ? [...new Set(data.lines.filter((l) => Number(l.actual_packs ?? 0) > 0).map((l) => Number(l.pack_size_g)))]
+        .filter((sz) => !resolveChild(data.map, job.output_product_code || primary?.item_code || '', sz, '').mapped)
+    : []
 
   // ── mutations ──────────────────────────────────────────────────────────
   async function run<T>(fn: () => Promise<T>) {
@@ -406,6 +410,9 @@ export default function JobDetail() {
               </table>
             </div>
           )}
+          {result && result.totalActualOutputG > inputWeightG && (
+            <Banner tone="warn">Output {formatWeight(result.totalActualOutputG)} exceeds input {formatWeight(inputWeightG)} — check the pack counts.</Banner>
+          )}
         </Section>
       )}
 
@@ -427,6 +434,11 @@ export default function JobDetail() {
           <OutputSummary result={result} activeSec={activeSec} packs={totalPacks} />
           <CostingSection result={result} machineHours={machineHours} machineRate={machineRate} laborRate={data.config.labor_cost_per_hour} manual={job.process_type === 'Manual'} />
           <Section title="Child SKU Generation">
+            {unmappedSizes.length > 0 && (
+              <Banner tone="warn">
+                No Parent-Child Master entry for <strong>{outProd}</strong> at {unmappedSizes.map((s) => `${s}g`).join(', ')} — child codes will be auto-generated. Add them in Config → Parent-Child Master for proper codes/barcodes.
+              </Banner>
+            )}
             <div className="flex flex-wrap items-center gap-3">
               <button className="btn-primary" onClick={generateChildSkus} disabled={busy || totalPacks === 0}>
                 {data.childCount > 0 ? 'Regenerate Child SKUs' : 'Generate Child SKUs'}

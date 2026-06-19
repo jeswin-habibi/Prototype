@@ -1,13 +1,16 @@
+import { Suspense, lazy } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { isSupabaseConfigured } from './lib/supabase'
 import { NavGuardProvider, useNavGuard } from './lib/navGuard'
-import { Banner } from './components/ui'
-import Dashboard from './pages/Dashboard'
-import Receipt from './pages/Receipt'
-import Jobs from './pages/Jobs'
-import JobDetail from './pages/JobDetail'
-import Records from './pages/Records'
-import Config from './pages/Config'
+import { Banner, Spinner } from './components/ui'
+
+// Lazy-load pages so the heavy chart/xlsx code only loads when its screen is opened.
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Receipt = lazy(() => import('./pages/Receipt'))
+const Jobs = lazy(() => import('./pages/Jobs'))
+const JobDetail = lazy(() => import('./pages/JobDetail'))
+const Records = lazy(() => import('./pages/Records'))
+const Config = lazy(() => import('./pages/Config'))
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', short: 'Home', icon: '📊' },
@@ -127,16 +130,18 @@ function AppShell() {
               <code className="rounded bg-rose-100 px-1">.env.example</code>).
             </Banner>
           )}
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/receipt" element={<Receipt />} />
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/jobs/:id" element={<JobDetail />} />
-            <Route path="/records" element={<Records />} />
-            <Route path="/config" element={<Config />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <Suspense fallback={<Spinner />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/receipt" element={<Receipt />} />
+              <Route path="/jobs" element={<Jobs />} />
+              <Route path="/jobs/:id" element={<JobDetail />} />
+              <Route path="/records" element={<Records />} />
+              <Route path="/config" element={<Config />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
 
