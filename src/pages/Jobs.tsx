@@ -191,14 +191,6 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
     setOperator((o) => o || refData.employees[0]?.code || '')
   }, [refData])
 
-  // Lock background scroll while the qty prompt is open.
-  useEffect(() => {
-    if (!qtyFor) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prev }
-  }, [qtyFor])
-
   const parentsById = useMemo(() => {
     const map: Record<string, ParentItem> = {}
     for (const p of refData?.parents ?? []) map[p.id] = p
@@ -425,31 +417,27 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
         <button className="btn-primary ml-auto" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create Job'}</button>
       </div>
 
-      {/* Required-qty prompt — portal to body (bottom sheet on mobile, centred card on desktop) */}
+      {/* Required-qty prompt — portal to body, centred modal */}
       {qtyFor && createPortal(
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 sm:items-center sm:p-4" onClick={() => { setQtyFor(null); setQtyInput('') }}>
-          <div
-            className="w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-lift sm:rounded-2xl"
-            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-bold text-slate-900">Required quantity</h3>
-            <p className="mt-1 text-xs text-slate-500">{qtyFor.item_code} — {qtyFor.description}</p>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4" onClick={() => { setQtyFor(null); setQtyInput('') }}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lift" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-bold text-slate-900">Required quantity</h3>
+            <p className="mt-1 text-sm text-slate-600">{qtyFor.item_code} — {qtyFor.description}</p>
             <p className="mt-0.5 text-xs text-slate-400">Available: {formatWeight(remainingG(qtyFor))}</p>
-            <label className="label mt-3">Weight to draw (kg)</label>
+            <label className="label mt-4">Weight to draw (kg)</label>
             <input
-              className="input"
+              className="input text-base"
               type="number"
+              inputMode="decimal"
               step="0.1"
-              autoFocus
               value={qtyInput}
               max={qtyMaxKg}
               placeholder={`≤ ${qtyMaxKg.toFixed(1)}`}
               onChange={(e) => setQtyInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') confirmQty() }}
             />
-            {qtyInput !== '' && !qtyValid && <div className="mt-1 text-xs text-rose-600">Enter a value between 0 and {qtyMaxKg.toFixed(1)} kg.</div>}
-            <div className="mt-4 flex justify-end gap-2">
+            {qtyInput !== '' && !qtyValid && <div className="mt-1.5 text-xs text-rose-600">Enter a value between 0 and {qtyMaxKg.toFixed(1)} kg.</div>}
+            <div className="mt-5 grid grid-cols-2 gap-2">
               <button type="button" className="btn-secondary" onClick={() => { setQtyFor(null); setQtyInput('') }}>Cancel</button>
               <button type="button" className="btn-primary" onClick={confirmQty} disabled={!qtyValid}>Add</button>
             </div>
