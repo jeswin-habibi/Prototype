@@ -7,6 +7,18 @@ import { formatWeight } from '../lib/units'
 import type { Employee, Machine, ParentChildMap, ParentItem, ProcessType, RepackJob } from '../types'
 import { Banner, Empty, PageHeader, Section, Spinner, StatusBadge } from '../components/ui'
 
+// Days from today until a YYYY-MM-DD date (negative = already expired).
+function daysUntil(d: string | null): number | null {
+  if (!d) return null
+  return Math.ceil((new Date(d + 'T00:00:00').getTime() - Date.now()) / 86_400_000)
+}
+function expTone(days: number | null): string {
+  if (days == null) return 'text-slate-400'
+  if (days < 0) return 'text-rose-600'
+  if (days <= 30) return 'text-amber-600'
+  return 'text-emerald-600'
+}
+
 interface JobRow extends RepackJob {
   parent: ParentItem | null
 }
@@ -189,6 +201,17 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
   const fefoWarn = (p: ParentItem) =>
     (refData?.parents ?? []).some((o) => o.item_code === p.item_code && o.id !== p.id && remainingG(o) > 0 && !!o.expiry_date && !!p.expiry_date && o.expiry_date < p.expiry_date)
 
+  // The single soonest-expiring batch that still has stock → tagged "Use first".
+  const soonestId = useMemo(() => {
+    let best: string | null = null, bestDate: string | null = null
+    for (const p of refData?.parents ?? []) {
+      const rem = Number(p.total_weight_g) - (refData?.consumed[p.id] ?? 0)
+      if (rem <= 0 || !p.expiry_date) continue
+      if (bestDate == null || p.expiry_date < bestDate) { bestDate = p.expiry_date; best = p.id }
+    }
+    return best
+  }, [refData])
+
   const selectedEntries = Object.entries(selected).filter(([, w]) => Number(w) > 0)
   const totalDrawnG = selectedEntries.reduce((s, [, w]) => s + (Number(w) || 0) * 1000, 0)
   const selectedCodes = [...new Set(selectedEntries.map(([pid]) => parentsById[pid]?.item_code).filter(Boolean))]
@@ -342,6 +365,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
           <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 shadow-card">
             <div className="border-b border-slate-100 p-2">
               <input className="input" autoFocus placeholder="Search description / ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <p className="mt-1 px-1 text-[11px] font-medium text-slate-400">↓ Soonest expiry first — use the top one first</p>
             </div>
             <div className="max-h-64 overflow-auto">
               {filtered.length === 0 ? (
@@ -350,18 +374,25 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
                 filtered.map((p) => {
                   const checked = p.id in selected
                   const rem = remainingG(p)
+                  const days = daysUntil(p.expiry_date)
                   return (
                     <label key={p.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-50 px-3 py-2 ${checked ? 'bg-brand-50/40' : 'hover:bg-slate-50'}`}>
                       <input type="checkbox" className="h-4 w-4 shrink-0" checked={checked} disabled={rem <= 0 && !checked} onChange={() => onCheck(p)} />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center justify-between gap-2">
-                          <span className="font-medium text-slate-800">{p.item_code}</span>
-                          <span className={`text-xs ${rem <= 0 ? 'text-rose-500' : 'text-slate-500'}`}>{formatWeight(rem)} left</span>
+                          <span className="flex items-center gap-1.5 font-medium text-slate-800">
+                            {p.item_code}
+                            {p.id === soonestId && <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-700">⏱ Use first</span>}
+                          </span>
+                          <span className={`shrink-0 text-xs font-semibold ${expTone(days)}`}>
+                            {days == null ? 'no expiry' : days < 0 ? `expired ${-days}d ago` : `${days}d left`}
+                          </span>
                         </span>
-                        <span className="block truncate text-xs text-slate-500">{p.description}</span>
-                        <span className="block text-[11px] text-slate-400">
-                          Exp {dateOnly(p.expiry_date)}{fefoWarn(p) && <span className="ml-1 text-amber-600">• earlier-expiry batch in stock</span>}
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-xs text-slate-500">{p.description}</span>
+                          <span className={`shrink-0 text-[11px] ${rem <= 0 ? 'text-rose-500' : 'text-slate-400'}`}>{formatWeight(rem)} left</span>
                         </span>
+                        <span className="block text-[11px] text-slate-400">Exp {dateOnly(p.expiry_date)}{fefoWarn(p) && <span className="ml-1 text-amber-600">• earlier batch in stock</span>}</span>
                       </span>
                     </label>
                   )
