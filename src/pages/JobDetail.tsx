@@ -328,7 +328,7 @@ export default function JobDetail() {
 
       {/* Processing controls + timing */}
       <Section title="Processing">
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Start" valueClassName="text-sm" value={job.start_at ? dateTime(job.start_at) : '—'} sub={job.shift ?? ''} />
           <Stat label="Active time" value={formatDuration(activeSec)} sub={running ? 'running…' : status === 'On Hold' ? 'paused' : ''} tone={status === 'On Hold' ? 'warn' : 'default'} />
           <Stat label="Complete" valueClassName="text-sm" value={job.complete_at ? dateTime(job.complete_at) : '—'} />

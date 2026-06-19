@@ -300,7 +300,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-200">
+        <div className="max-h-72 overflow-auto rounded-lg border border-slate-200">
           <table className="w-full">
             <thead className="sticky top-0 bg-slate-50">
               <tr className="border-b border-slate-200">

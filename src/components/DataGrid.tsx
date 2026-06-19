@@ -14,7 +14,7 @@ export interface GridCol {
   options?: string[]
   /** read-only display (type='computed') */
   compute?: (row: Record<string, unknown>) => ReactNode
-  /** max-width utility class for the cell input */
+  /** max-width utility class for the cell input (desktop) */
   width?: string
 }
 
@@ -139,17 +139,13 @@ export default function DataGrid({
                 className="hidden"
                 onChange={(e) => e.target.files && onFile(e.target.files[0])}
               />
-              <button className="btn-secondary" onClick={() => fileRef.current?.click()} disabled={busy}>
-                ⬆ Import
-              </button>
-              <button className="btn-secondary" onClick={() => downloadTemplate(headers, `${fileBaseName}-template.xlsx`)}>
-                ⬇ Template
-              </button>
+              <button className="btn-secondary text-xs sm:text-sm" onClick={() => fileRef.current?.click()} disabled={busy}>⬆ Import</button>
+              <button className="btn-secondary text-xs sm:text-sm" onClick={() => downloadTemplate(headers, `${fileBaseName}-template.xlsx`)}>⬇ Template</button>
             </>
           )}
           {exportColumns && data && data.length > 0 && (
             <button
-              className="btn-secondary"
+              className="btn-secondary text-xs sm:text-sm"
               onClick={() =>
                 exportRows(
                   data.map((r) => Object.fromEntries(exportColumns.map((c) => [c.header, r[c.field] ?? '']))),
@@ -160,9 +156,7 @@ export default function DataGrid({
               ⬇ Export
             </button>
           )}
-          <button className="btn-secondary" onClick={add} disabled={busy}>
-            + Add
-          </button>
+          <button className="btn-primary text-xs sm:text-sm" onClick={add} disabled={busy}>+ Add</button>
         </div>
       }
     >
@@ -174,36 +168,54 @@ export default function DataGrid({
       ) : !data || data.length === 0 ? (
         <Empty>No entries yet.</Empty>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                {cols.map((c) => (
-                  <th key={c.field} className="th">
-                    {c.label}
-                  </th>
-                ))}
-                <th className="th" />
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row) => (
-                <tr key={String(row.id)} className="border-b border-slate-100">
+        <>
+          {/* Mobile: each row is a card with labelled fields */}
+          <div className="space-y-3 md:hidden">
+            {data.map((row) => (
+              <div key={String(row.id)} className="rounded-xl border border-slate-200 bg-white p-3 shadow-soft">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
                   {cols.map((c) => (
-                    <td key={c.field} className="td">
-                      <Cell col={c} row={row} onSave={(v) => persist(row, c.field, v)} />
-                    </td>
+                    <div key={c.field} className={c.type === 'boolean' ? 'col-span-2 flex items-center justify-between' : ''}>
+                      <label className="label mb-0.5">{c.label}</label>
+                      <Cell col={c} row={row} mobile onSave={(v) => persist(row, c.field, v)} />
+                    </div>
                   ))}
-                  <td className="td text-right">
-                    <button className="text-rose-600 hover:underline" onClick={() => remove(String(row.id))}>
-                      Delete
-                    </button>
-                  </td>
+                </div>
+                <div className="mt-2.5 flex justify-end border-t border-slate-100 pt-2">
+                  <button className="text-sm font-medium text-rose-600" onClick={() => remove(String(row.id))}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  {cols.map((c) => (
+                    <th key={c.field} className="th">{c.label}</th>
+                  ))}
+                  <th className="th" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.map((row) => (
+                  <tr key={String(row.id)} className="border-b border-slate-100">
+                    {cols.map((c) => (
+                      <td key={c.field} className="td">
+                        <Cell col={c} row={row} onSave={(v) => persist(row, c.field, v)} />
+                      </td>
+                    ))}
+                    <td className="td text-right">
+                      <button className="text-rose-600 hover:underline" onClick={() => remove(String(row.id))}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </Section>
   )
@@ -213,36 +225,31 @@ function Cell({
   col,
   row,
   onSave,
+  mobile,
 }: {
   col: GridCol
   row: Record<string, unknown>
   onSave: (value: unknown) => void
+  mobile?: boolean
 }) {
   const raw = row[col.field]
-  if (col.type === 'computed') return <span className="text-slate-600">{col.compute ? col.compute(row) : ''}</span>
+  const cls = mobile ? 'input w-full' : `input ${col.width ?? 'max-w-[180px]'}`
+  if (col.type === 'computed') return <span className="text-sm text-slate-700">{col.compute ? col.compute(row) : ''}</span>
   if (col.type === 'boolean')
-    return <input type="checkbox" checked={Boolean(raw)} onChange={(e) => onSave(e.target.checked)} />
+    return <input type="checkbox" className="h-4 w-4" checked={Boolean(raw)} onChange={(e) => onSave(e.target.checked)} />
   if (col.type === 'select')
     return (
-      <select
-        className={`input ${col.width ?? 'max-w-[150px]'}`}
-        defaultValue={raw == null ? '' : String(raw)}
-        onChange={(e) => onSave(e.target.value)}
-      >
+      <select className={cls} defaultValue={raw == null ? '' : String(raw)} onChange={(e) => onSave(e.target.value)}>
         {(col.options ?? []).map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
+          <option key={o} value={o}>{o}</option>
         ))}
       </select>
     )
   return (
     <input
-      className={`input ${col.width ?? 'max-w-[180px]'}`}
+      className={cls}
       type={col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text'}
-      defaultValue={
-        raw == null ? '' : col.type === 'date' ? String(raw).slice(0, 10) : String(raw)
-      }
+      defaultValue={raw == null ? '' : col.type === 'date' ? String(raw).slice(0, 10) : String(raw)}
       onBlur={(e) => onSave(coerce(col.type, e.target.value))}
     />
   )

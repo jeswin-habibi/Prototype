@@ -78,11 +78,11 @@ export default function Dashboard() {
           <div className="flex flex-wrap items-end gap-2">
             <div>
               <label className="label">From</label>
-              <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <input className="input max-w-[150px]" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
             </div>
             <div>
               <label className="label">To</label>
-              <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              <input className="input max-w-[150px]" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
             </div>
             {(from || to) && <button className="btn-secondary" onClick={() => { setFrom(''); setTo('') }}>Clear</button>}
           </div>
@@ -94,7 +94,7 @@ export default function Dashboard() {
       ) : (
         <>
           {/* KPI strip */}
-          <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mb-3 grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             <Stat icon="⚖️" valueClassName="text-xl" label="Input weight" value={`${num(Math.round(m.inputKg))} kg`} />
             <Stat icon="📦" valueClassName="text-xl" label="Output weight" value={`${num(Math.round(m.outputKg))} kg`} />
             <Stat icon="📈" valueClassName="text-xl" label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
@@ -106,7 +106,7 @@ export default function Dashboard() {
           </div>
 
           {/* Status pipeline */}
-          <div className="mb-4 grid gap-3 sm:grid-cols-4">
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Created" value={num(m.statusCounts.Created)} />
             <Stat label="Processing" value={num(m.statusCounts.Processing)} tone="warn" />
             <Stat label="On Hold" value={num(m.statusCounts['On Hold'])} tone="warn" />
