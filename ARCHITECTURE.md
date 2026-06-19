@@ -11,9 +11,10 @@ Last updated: **2026-06-19**
 > **inputs-as-a-list (`job_parents`) + a declared output product (`parent_child_map`)**, with an
 > On-Hold lifecycle, snapshot-based dashboard, and accounts (5 phases — see Iteration Log).
 > New schema columns/tables are added **alongside** legacy ones so screens migrate phase-by-phase.
-> **Phases 1–2 done:** new data model + Parent-Child Master + editable Receipt grid (P1);
-> multi-parent/blend job flow with On-Hold active-time tracking, master-driven child SKUs, and
-> cost snapshots (P2). Pending: Records split (P3), new Dashboard (P4), scale + auth (P5).
+> **Phases 1–4 done:** data model + Parent-Child Master + editable Receipt (P1); multi-parent/blend
+> job flow with On-Hold active-time tracking, master-driven child SKUs, cost snapshots (P2);
+> Records split into Child SKUs + Parent Adjustments (P3); snapshot-based Dashboard with date filter
+> and drill-through (P4). Pending: scale hardening + auth/roles (P5).
 
 ---
 
@@ -168,12 +169,18 @@ job screen is "locked" — `useBlockNavigation` (`src/lib/navGuard.tsx`) blocks 
 on browser refresh/close. The user must **Generate Child SKUs** (commit) or **Cancel Process** (revert
 to `Created`, clear actuals + wastage, keep the planned mix) to leave.
 
-**Dashboard scope:** `computeMetrics()` reflects every job with `status === 'Completed'` and computes
-all figures **live** via the same `calculateCost()` engine the job screen uses (loads `costing_config`,
-`packaging_costs`, `machines` for overrides). Dashboard and job-screen numbers therefore always agree.
-`child_skus` are NOT read by the dashboard — they remain the deliberate ERP snapshot for the Records
-page. Cost-per-pack by size is a packs-weighted average across completed jobs; `totalValue` = Σ job
-`totalBatchCost`.
+**Records** (`Records.tsx`): two tabs. **Child SKUs** — generated rows with master-derived identity;
+`expiry_date` is inline-editable; Excel export (`exportChildRecords`). **Parent Adjustments** — a view
+over `job_parents` (parent id, description, output product, drawn weight, material cost) with a live
+**balance weight** = `parent.total_weight_g − Σ draws` against that parent; Excel export.
+
+**Dashboard scope** (`Dashboard.tsx`): reads the **`job_cost_snapshot`** rows (frozen at generation)
+plus `child_skus` (size/child drill-through) and `job_wastage` (joined to jobs for process_type /
+output product / category), all **filtered by date** at the DB. KPIs (input/output/yield/waste/packs/
+value + status pipeline), output-by-size and cost-per-pack-by-size **bar drill-through to child items**,
+wastage by reason / process / parent / category, a day/month/year **production trend**, avg time by
+parent/category, and a Manual-vs-Machine table. Aggregation is client-side over the compact snapshot
+set; moving it into a Postgres RPC / materialized view is the Phase 5 scale step.
 
 ---
 
@@ -207,6 +214,8 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-19** — **Restructure Phase 4**: Dashboard rebuilt on **`job_cost_snapshot`** with a **date filter** and **drill-through** (output-by-size and cost-per-pack-by-size bars drill to child items; hover tooltips). Adds wastage by reason/process/parent/category, day/month/year production trend, avg production time by parent/category, and a Manual-vs-Machine comparison. Reads compact snapshots (not raw recompute); client-side aggregation (server RPC deferred to P5).
+- **2026-06-19** — **Restructure Phase 3**: `Records.tsx` split into **Child SKUs** (master-derived identity, inline-editable expiry, Excel export) and **Parent Adjustments** (view over `job_parents` with live balance weight per parent, Excel export).
 - **2026-06-19** — **Restructure Phase 2**: multi-parent/blend job flow. `Jobs.tsx` create form rebuilt (Machine/Manual, searchable expiry-sorted multi-parent picker with per-parent weight draw capped at remaining, output-product/blend selection → `job_parents`). `JobDetail.tsx` rewritten: planned-output removed; **Start/Hold/Resume/Stop** logged to `job_time_events` with **active-time** costing (`time.ts`, On-Hold excluded); post-stop actual pack lines; auto **QC Rejects** wastage = remaining; Manual ⇒ machine cost 0; child SKUs resolved from `parent_child_map` (`childMap.ts`, latest expiry for blends) + **`job_cost_snapshot`** written. New `time.ts`/`time.test.ts`, `childMap.ts`. (NB: the legacy `Dashboard.tsx` still reads single-parent fields — accurate for single-parent jobs, approximate for blends — until the Phase 4 snapshot-based rebuild.)
 - **2026-06-19** — **Restructure Phase 1** (branch `restructure/multi-parent-blends`): new data model added alongside legacy (tables `parent_child_map`, `job_parents`, `job_time_events`, `job_cost_snapshot`; new columns on `parent_items`/`repack_jobs`/`child_skus`; `'On Hold'` status; indexes). New reusable **`DataGrid`** (CRUD + Import/Template/Export, supersedes `MasterEditor`). **Config** gains the **Parent-Child Master**. **Receipt** rebuilt as an inline-editable grid (import/template/export) with `parent.ts::parentRow()` deriving the legacy mirror. `excel.ts` generalized (`parseParentChildMap`, `downloadTemplate`, `exportRows`). Phases 2–5 (multi-parent job flow + On-Hold, Records split, new Dashboard, scale+auth) pending. _(plan: `~/.claude/plans/i-want-to-make-declarative-sunrise.md`)_
 - **2026-06-15** — Visual redesign: Inter font, brand teal scale + soft shadows, gradient body background, gradient buttons/brand marks, icon-chip stat cards, accent section headers, dotted status badges, polished nav active states.

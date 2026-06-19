@@ -1,278 +1,399 @@
-import { useMemo, type ReactElement } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/useData'
-import { toGrams } from '../lib/units'
-import { calculateCost, hoursBetween } from '../lib/cost'
 import { money, num, pct } from '../lib/format'
-import type { CostingConfig, JobPackSize, JobWastage, Machine, PackagingCost, ParentItem, RepackJob } from '../types'
+import type { JobCostSnapshot, JobStatus, ProcessType } from '../types'
 import { Empty, PageHeader, Section, Spinner, Stat } from '../components/ui'
 
-interface Bundle {
-  parents: ParentItem[]
-  jobs: (RepackJob & { parent: ParentItem })[]
-  packLines: JobPackSize[]
-  wastage: JobWastage[]
-  config: CostingConfig
-  packagingCosts: PackagingCost[]
-  machines: Machine[]
-}
+const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6', '#ec4899', '#22c55e']
 
-const COLORS = ['#0f766e', '#14b8a6', '#f59e0b', '#ef4444', '#6366f1', '#8b5cf6', '#ec4899']
+type ChildRow = {
+  pack_size_g: number
+  quantity: number
+  unit_cost: number
+  total_value: number
+  child_item_code: string
+  output_product_code: string | null
+  category: string
+  created_at: string
+}
+type WasteRow = {
+  grams: number
+  reason: string
+  job: { process_type: ProcessType; output_product_code: string | null; complete_at: string | null; status: JobStatus } | null
+}
+interface Bundle {
+  snaps: JobCostSnapshot[]
+  children: ChildRow[]
+  wastage: WasteRow[]
+  statusCounts: Record<JobStatus, number>
+}
+type Granularity = 'day' | 'month' | 'year'
 
 export default function Dashboard() {
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [gran, setGran] = useState<Granularity>('day')
+  const [drillOutput, setDrillOutput] = useState<number | null>(null)
+  const [drillCost, setDrillCost] = useState<number | null>(null)
+
   const { data, loading } = useData<Bundle>(async () => {
-    const [parents, jobs, packLines, wastage, cfg, pc, machines] = await Promise.all([
-      supabase.from('parent_items').select('*'),
-      supabase.from('repack_jobs').select('*, parent:parent_items(*)'),
-      supabase.from('job_pack_sizes').select('*'),
-      supabase.from('job_wastage').select('*'),
-      supabase.from('costing_config').select('*').limit(1).maybeSingle(),
-      supabase.from('packaging_costs').select('*'),
-      supabase.from('machines').select('*'),
+    const range = <T extends { gte: (c: string, v: string) => T; lte: (c: string, v: string) => T }>(q: T, col: string, hiSuffix = '') => {
+      let r = q
+      if (from) r = r.gte(col, from)
+      if (to) r = r.lte(col, to + hiSuffix)
+      return r
+    }
+    const countStatus = (s: JobStatus) => supabase.from('repack_jobs').select('id', { count: 'exact', head: true }).eq('status', s)
+    const [snapRes, childRes, wasteRes, cCreated, cProcessing, cHold, cCompleted] = await Promise.all([
+      range(supabase.from('job_cost_snapshot').select('*'), 'completed_on'),
+      range(supabase.from('child_skus').select('pack_size_g, quantity, unit_cost, total_value, child_item_code, output_product_code, category, created_at'), 'created_at', 'T23:59:59'),
+      supabase.from('job_wastage').select('grams, reason, job:repack_jobs(process_type, output_product_code, complete_at, status)'),
+      countStatus('Created'), countStatus('Processing'), countStatus('On Hold'), countStatus('Completed'),
     ])
     return {
-      parents: parents.data ?? [],
-      jobs: (jobs.data ?? []) as Bundle['jobs'],
-      packLines: packLines.data ?? [],
-      wastage: wastage.data ?? [],
-      config: (cfg.data as CostingConfig) ?? { id: '', machine_cost_per_hour: 0, labor_cost_per_hour: 0 },
-      packagingCosts: pc.data ?? [],
-      machines: machines.data ?? [],
+      snaps: (snapRes.data ?? []) as JobCostSnapshot[],
+      children: (childRes.data ?? []) as ChildRow[],
+      wastage: (wasteRes.data ?? []) as unknown as WasteRow[],
+      statusCounts: {
+        Created: cCreated.count ?? 0,
+        Processing: cProcessing.count ?? 0,
+        'On Hold': cHold.count ?? 0,
+        Completed: cCompleted.count ?? 0,
+      },
     }
-  }, [])
+  }, [from, to])
 
-  const m = useMemo(() => (data ? computeMetrics(data) : null), [data])
-
-  if (loading) return <Spinner />
-  if (!m) return <Empty>No data.</Empty>
+  const m = useMemo(() => (data ? computeMetrics(data, gran, from, to) : null), [data, gran, from, to])
 
   return (
     <div>
-      <PageHeader title="Owner Dashboard" subtitle="Repacking efficiency, cost and margin-leak at a glance." />
+      <PageHeader
+        title="Owner Dashboard"
+        subtitle="Repacking efficiency, cost and loss — filtered by completion date."
+        actions={
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="label">From</label>
+              <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">To</label>
+              <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </div>
+            {(from || to) && <button className="btn-secondary" onClick={() => { setFrom(''); setTo('') }}>Clear</button>}
+          </div>
+        }
+      />
 
-      {/* KPI strip */}
-      <div className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat icon="📦" valueClassName="text-xl" label="Parents received" value={num(m.parentCount)} sub={`${num(Math.round(m.parentWeightG / 1000))} kg`} />
-        <Stat icon="✅" valueClassName="text-xl" label="Jobs completed" value={num(m.completedCount)} sub={`${num(m.jobsTotal)} total jobs`} />
-        <Stat icon="📈" valueClassName="text-xl" label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
-        <Stat icon="🗑️" valueClassName="text-xl" label="Avg wastage" value={pct(m.avgWastage)} tone={m.avgWastage <= 5 ? 'good' : 'warn'} />
-        <Stat icon="🧱" valueClassName="text-xl" label="Packs produced" value={num(m.totalPacks)} />
-        <Stat icon="💰" valueClassName="text-xl" label="Output value" value={money(m.totalValue)} />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Output by Pack Size (packs)">
-          <Chart empty={m.outputBySize.length === 0}>
-            <BarChart data={m.outputBySize}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="size" fontSize={12} />
-              <YAxis fontSize={12} />
-              <Tooltip />
-              <Bar dataKey="packs" fill="#0f766e" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </Chart>
-        </Section>
-
-        <Section title="Cost per Pack by Size">
-          <Chart empty={m.costBySize.length === 0}>
-            <BarChart data={m.costBySize}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="size" fontSize={12} />
-              <YAxis fontSize={12} />
-              <Tooltip formatter={(v) => money(Number(v), 4)} />
-              <Bar dataKey="cost" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </Chart>
-        </Section>
-
-        <Section title="Wastage Breakdown (g)">
-          <Chart empty={m.wastageByReason.length === 0}>
-            <PieChart>
-              <Pie data={m.wastageByReason} dataKey="grams" nameKey="reason" outerRadius={90} label>
-                {m.wastageByReason.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v) => `${num(Number(v))} g`} />
-              <Legend />
-            </PieChart>
-          </Chart>
-        </Section>
-
-        <Section title="Daily Yield & QC Rejects">
-          <Chart empty={m.daily.length === 0}>
-            <LineChart data={m.daily}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="day" tickFormatter={(d) => String(d).slice(5)} fontSize={12} />
-              <YAxis yAxisId="left" fontSize={12} />
-              <YAxis yAxisId="right" orientation="right" fontSize={12} />
-              <Tooltip />
-              <Legend />
-              <Line yAxisId="left" type="monotone" dataKey="yield" name="Yield %" stroke="#0f766e" strokeWidth={2} />
-              <Line yAxisId="right" type="monotone" dataKey="qc" name="QC rejects (g)" stroke="#ef4444" strokeWidth={2} />
-            </LineChart>
-          </Chart>
-        </Section>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-3">
-        <VarianceTable title="Variance by Machine" rows={m.byMachine} />
-        <VarianceTable title="Variance by Operator" rows={m.byOperator} />
-        <VarianceTable title="Variance by Shift" rows={m.byShift} />
-      </div>
-    </div>
-  )
-}
-
-function Chart({ children, empty }: { children: ReactElement; empty: boolean }) {
-  if (empty) return <Empty>Not enough data yet.</Empty>
-  return (
-    <div style={{ width: '100%', height: 260 }}>
-      <ResponsiveContainer>{children}</ResponsiveContainer>
-    </div>
-  )
-}
-
-function VarianceTable({ title, rows }: { title: string; rows: { key: string; yield: number; jobs: number }[] }) {
-  return (
-    <Section title={title}>
-      {rows.length === 0 ? (
-        <Empty>No completed jobs.</Empty>
+      {loading || !m ? (
+        <Spinner />
       ) : (
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-200">
-              <th className="th">Group</th>
-              <th className="th">Jobs</th>
-              <th className="th">Avg yield</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.key} className="border-b border-slate-100">
-                <td className="td font-medium">{r.key}</td>
-                <td className="td">{r.jobs}</td>
-                <td className="td">
-                  <span className={r.yield >= 90 ? 'text-emerald-600' : r.yield >= 75 ? 'text-amber-600' : 'text-rose-600'}>
-                    {pct(r.yield)}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          {/* KPI strip */}
+          <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Stat icon="⚖️" valueClassName="text-xl" label="Input weight" value={`${num(Math.round(m.inputKg))} kg`} />
+            <Stat icon="📦" valueClassName="text-xl" label="Output weight" value={`${num(Math.round(m.outputKg))} kg`} />
+            <Stat icon="📈" valueClassName="text-xl" label="Avg yield" value={pct(m.avgYield)} tone={m.avgYield >= 90 ? 'good' : m.avgYield >= 75 ? 'warn' : 'bad'} />
+            <Stat icon="🗑️" valueClassName="text-xl" label="Avg waste %" value={pct(m.avgWastePct)} tone={m.avgWastePct <= 5 ? 'good' : 'warn'} />
+            <Stat icon="♻️" valueClassName="text-xl" label="Total wastage" value={`${num(Math.round(m.totalWastageKg))} kg`} />
+            <Stat icon="🧮" valueClassName="text-xl" label="Packs produced" value={num(m.packsProduced)} />
+            <Stat icon="💰" valueClassName="text-xl" label="Output value" value={money(m.outputValue)} />
+            <Stat icon="✅" valueClassName="text-xl" label="Completed jobs" value={num(m.statusCounts.Completed)} />
+          </div>
+
+          {/* Status pipeline */}
+          <div className="mb-4 grid gap-3 sm:grid-cols-4">
+            <Stat label="Created" value={num(m.statusCounts.Created)} />
+            <Stat label="Processing" value={num(m.statusCounts.Processing)} tone="warn" />
+            <Stat label="On Hold" value={num(m.statusCounts['On Hold'])} tone="warn" />
+            <Stat label="Completed" value={num(m.statusCounts.Completed)} tone="good" />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {/* Output by pack size (drill → child items) */}
+            <Section title={drillOutput == null ? 'Output by pack size' : `Output — ${drillOutput}g by child (top to bottom)`}>
+              {drillOutput != null && (
+                <button className="mb-2 text-sm text-brand hover:underline" onClick={() => setDrillOutput(null)}>← All sizes</button>
+              )}
+              <Bars
+                data={drillOutput == null ? m.outputBySize : (m.outputDrill[drillOutput] ?? [])}
+                xKey="label"
+                yKey="packs"
+                yLabel="packs"
+                onBarClick={drillOutput == null ? (e) => setDrillOutput(Number(e.size)) : undefined}
+              />
+              {drillOutput == null && <p className="mt-1 text-xs text-slate-400">Click a bar to drill into child items.</p>}
+            </Section>
+
+            {/* Cost per pack by size (drill → child avg cost) */}
+            <Section title={drillCost == null ? 'Cost per pack by size' : `Cost / pack — ${drillCost}g by child`}>
+              {drillCost != null && (
+                <button className="mb-2 text-sm text-brand hover:underline" onClick={() => setDrillCost(null)}>← All sizes</button>
+              )}
+              <Bars
+                data={drillCost == null ? m.costBySize : (m.costDrill[drillCost] ?? [])}
+                xKey="label"
+                yKey="cost"
+                yLabel="cost/pack"
+                money
+                onBarClick={drillCost == null ? (e) => setDrillCost(Number(e.size)) : undefined}
+              />
+              {drillCost == null && <p className="mt-1 text-xs text-slate-400">Click a bar to drill into child items.</p>}
+            </Section>
+
+            {/* Wastage breakdown by reason */}
+            <Section title="Wastage by reason">
+              {m.wastageByReason.length === 0 ? <Empty>No wastage in range.</Empty> : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie data={m.wastageByReason} dataKey="grams" nameKey="reason" outerRadius={90} label={(e) => e.reason}>
+                      {m.wastageByReason.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => `${num(v)} g`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </Section>
+
+            {/* Manual vs Machine wastage */}
+            <Section title="Wastage: Manual vs Machine">
+              <Bars data={m.wastageByProcess} xKey="label" yKey="grams" yLabel="grams" />
+            </Section>
+
+            {/* Production trend */}
+            <Section
+              title="Production trend"
+              actions={
+                <select className="input max-w-[130px]" value={gran} onChange={(e) => setGran(e.target.value as Granularity)}>
+                  <option value="day">Daily</option>
+                  <option value="month">Monthly</option>
+                  <option value="year">Yearly</option>
+                </select>
+              }
+            >
+              {m.trend.length === 0 ? <Empty>No completed jobs in range.</Empty> : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <LineChart data={m.trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
+                    <XAxis dataKey="key" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="l" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line yAxisId="l" type="monotone" dataKey="outputKg" name="Output (kg)" stroke="#0f766e" strokeWidth={2} />
+                    <Line yAxisId="r" type="monotone" dataKey="yield" name="Yield %" stroke="#f59e0b" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </Section>
+
+            {/* Wastage by parent */}
+            <Section title="Wastage by parent (output product)">
+              <Bars data={m.wastageByParent} xKey="label" yKey="grams" yLabel="grams" />
+            </Section>
+
+            {/* Wastage by category */}
+            <Section title="Wastage by category">
+              <Bars data={m.wastageByCategory} xKey="label" yKey="grams" yLabel="grams" />
+            </Section>
+
+            {/* Avg time by parent */}
+            <Section title="Avg production time by parent (min)">
+              <Bars data={m.timeByParent} xKey="label" yKey="minutes" yLabel="min" />
+            </Section>
+
+            {/* Avg time by category */}
+            <Section title="Avg production time by category (min)">
+              <Bars data={m.timeByCategory} xKey="label" yKey="minutes" yLabel="min" />
+            </Section>
+
+            {/* Manual vs Machine comparison */}
+            <Section title="Manual vs Machine">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-200">
+                      <th className="th">Type</th><th className="th">Jobs</th><th className="th">Avg yield</th>
+                      <th className="th">Avg time (min)</th><th className="th">Cost / pack</th><th className="th">Output (kg)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.byProcess.map((r) => (
+                      <tr key={r.type} className="border-b border-slate-100">
+                        <td className="td font-medium">{r.type}</td>
+                        <td className="td">{num(r.jobs)}</td>
+                        <td className="td">{pct(r.avgYield)}</td>
+                        <td className="td">{num(Math.round(r.avgMinutes))}</td>
+                        <td className="td">{money(r.costPerPack, 4)}</td>
+                        <td className="td">{num(Math.round(r.outputKg))}</td>
+                      </tr>
+                    ))}
+                    {m.byProcess.length === 0 && <tr><td className="td text-slate-400" colSpan={6}>No completed jobs in range.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          </div>
+        </>
       )}
-    </Section>
+    </div>
   )
 }
 
-// ── pure aggregation ────────────────────────────────────────────────────────
-// Computed LIVE from source data via the same calculateCost() engine the job
-// screen uses, so dashboard and job figures always agree. Reflects every job
-// whose status is 'Completed' (independent of child-SKU generation).
-function computeMetrics(d: Bundle) {
-  const linesByJob = new Map<string, JobPackSize[]>()
-  for (const l of d.packLines) {
-    const arr = linesByJob.get(l.job_id) ?? []
-    arr.push(l)
-    linesByJob.set(l.job_id, arr)
-  }
-  const wasteByJob = new Map<string, JobWastage[]>()
-  for (const w of d.wastage) {
-    const arr = wasteByJob.get(w.job_id) ?? []
-    arr.push(w)
-    wasteByJob.set(w.job_id, arr)
-  }
-  const packCost = (g: number) => Number(d.packagingCosts.find((p) => Number(p.pack_size_g) === Number(g))?.cost_per_unit ?? 0)
-  const machineByCode = new Map(d.machines.map((m) => [m.code, m]))
+function Bars({
+  data, xKey, yKey, yLabel, money: isMoney, onBarClick,
+}: {
+  data: Record<string, unknown>[]
+  xKey: string
+  yKey: string
+  yLabel: string
+  money?: boolean
+  onBarClick?: (entry: Record<string, unknown>) => void
+}) {
+  if (data.length === 0) return <Empty>No data in range.</Empty>
+  return (
+    <ResponsiveContainer width="100%" height={240}>
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
+        <XAxis dataKey={xKey} tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
+        <YAxis tick={{ fontSize: 11 }} />
+        <Tooltip formatter={(v: number) => (isMoney ? money(v, 4) : `${num(v)} ${yLabel}`)} />
+        <Bar
+          dataKey={yKey}
+          radius={[4, 4, 0, 0]}
+          cursor={onBarClick ? 'pointer' : undefined}
+          onClick={onBarClick ? (e: unknown) => onBarClick((e as { payload: Record<string, unknown> }).payload) : undefined}
+        >
+          {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
 
-  const completed = d.jobs.filter((j) => j.status === 'Completed' && j.parent)
-  const perJob = completed.map((j) => {
-    const lines = linesByJob.get(j.id) ?? []
-    const ws = wasteByJob.get(j.id) ?? []
-    const res = calculateCost({
-      parentMaterialCost: Number(j.parent.total_value),
-      inputWeightG: toGrams(j.parent.quantity, j.parent.unit),
-      machineHours: hoursBetween(j.start_at, j.complete_at),
-      machineCostPerHour: machineByCode.get(j.machine_code ?? '')?.cost_per_hour_override ?? d.config.machine_cost_per_hour,
-      laborCostPerHour: d.config.labor_cost_per_hour,
-      packLines: lines.map((l) => ({
-        packSizeG: Number(l.pack_size_g),
-        actualPacks: Number(l.actual_packs ?? 0),
-        packagingPerUnit: packCost(l.pack_size_g),
-      })),
-      wastage: ws.map((w) => ({ reason: w.reason, grams: Number(w.grams) })),
-    })
+// ───────────────────────── aggregation ─────────────────────────
+function avg(xs: number[]): number {
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0
+}
+
+function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) {
+  const snaps = d.snaps
+  // category by output product (from child rows)
+  const catByProduct: Record<string, string> = {}
+  for (const c of d.children) if (c.output_product_code && c.category && !catByProduct[c.output_product_code]) catByProduct[c.output_product_code] = c.category
+
+  // KPIs
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
+  const inputG = sum(snaps.map((s) => Number(s.input_weight_g)))
+  const outputG = sum(snaps.map((s) => Number(s.output_weight_g)))
+  const totalWastageG = sum(snaps.map((s) => Number(s.wastage_g)))
+
+  // output by size + drill to child
+  const sizeAgg = new Map<number, { packs: number; value: number }>()
+  const outputDrill: Record<number, { label: string; packs: number; size: number }[]> = {}
+  const costDrill: Record<number, { label: string; cost: number; size: number }[]> = {}
+  const sizeChild = new Map<number, Map<string, { packs: number; value: number }>>()
+  for (const c of d.children) {
+    const size = Number(c.pack_size_g)
+    const a = sizeAgg.get(size) ?? { packs: 0, value: 0 }
+    a.packs += Number(c.quantity); a.value += Number(c.total_value)
+    sizeAgg.set(size, a)
+    const cm = sizeChild.get(size) ?? new Map()
+    const cc = cm.get(c.child_item_code) ?? { packs: 0, value: 0 }
+    cc.packs += Number(c.quantity); cc.value += Number(c.total_value)
+    cm.set(c.child_item_code, cc)
+    sizeChild.set(size, cm)
+  }
+  const sizes = [...sizeAgg.keys()].sort((a, b) => a - b)
+  const outputBySize = sizes.map((s) => ({ label: `${s}g`, packs: sizeAgg.get(s)!.packs, size: s }))
+  const costBySize = sizes.map((s) => { const a = sizeAgg.get(s)!; return { label: `${s}g`, cost: a.packs ? a.value / a.packs : 0, size: s } })
+  for (const s of sizes) {
+    const entries = [...(sizeChild.get(s) ?? new Map()).entries()] as [string, { packs: number; value: number }][]
+    outputDrill[s] = entries.map(([code, v]) => ({ label: code, packs: v.packs, size: s })).sort((a, b) => b.packs - a.packs)
+    costDrill[s] = entries.map(([code, v]) => ({ label: code, cost: v.packs ? v.value / v.packs : 0, size: s })).sort((a, b) => b.cost - a.cost)
+  }
+
+  // wastage rows in range + only completed jobs
+  const inRange = (iso: string | null) => {
+    if (!iso) return false
+    const day = iso.slice(0, 10)
+    if (from && day < from) return false
+    if (to && day > to) return false
+    return true
+  }
+  const waste = d.wastage.filter((w) => w.job && w.job.status === 'Completed' && inRange(w.job.complete_at))
+  const groupSum = <T,>(rows: T[], key: (r: T) => string, val: (r: T) => number) => {
+    const map = new Map<string, number>()
+    for (const r of rows) map.set(key(r), (map.get(key(r)) ?? 0) + val(r))
+    return [...map.entries()].map(([label, grams]) => ({ label, grams })).sort((a, b) => b.grams - a.grams)
+  }
+  const wastageByReason = groupSum(waste, (w) => w.reason || 'Unknown', (w) => Number(w.grams)).map((r) => ({ reason: r.label, grams: r.grams }))
+  const wastageByProcess = groupSum(waste, (w) => w.job!.process_type, (w) => Number(w.grams))
+  const wastageByParent = groupSum(waste, (w) => w.job!.output_product_code ?? '—', (w) => Number(w.grams)).slice(0, 12)
+  const wastageByCategory = groupSum(waste, (w) => catByProduct[w.job!.output_product_code ?? ''] ?? 'Uncategorized', (w) => Number(w.grams))
+
+  // trend
+  const keyOf = (s: JobCostSnapshot) => {
+    const day = (s.completed_on ?? '').slice(0, 10)
+    return gran === 'year' ? day.slice(0, 4) : gran === 'month' ? day.slice(0, 7) : day
+  }
+  const trendMap = new Map<string, { outG: number; yields: number[] }>()
+  for (const s of snaps) {
+    const k = keyOf(s) || '—'
+    const t = trendMap.get(k) ?? { outG: 0, yields: [] }
+    t.outG += Number(s.output_weight_g); t.yields.push(Number(s.yield_pct))
+    trendMap.set(k, t)
+  }
+  const trend = [...trendMap.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([key, v]) => ({ key, outputKg: Number((v.outG / 1000).toFixed(2)), yield: Number(avg(v.yields).toFixed(1)) }))
+
+  // avg time by parent / category
+  const timeGroup = (key: (s: JobCostSnapshot) => string) => {
+    const map = new Map<string, number[]>()
+    for (const s of snaps) { const k = key(s); map.set(k, [...(map.get(k) ?? []), Number(s.active_seconds) / 60]) }
+    return [...map.entries()].map(([label, mins]) => ({ label, minutes: Number(avg(mins).toFixed(1)) })).sort((a, b) => b.minutes - a.minutes).slice(0, 12)
+  }
+  const timeByParent = timeGroup((s) => s.output_product_code ?? '—')
+  const timeByCategory = timeGroup((s) => catByProduct[s.output_product_code ?? ''] ?? 'Uncategorized')
+
+  // manual vs machine
+  const byProcessMap = new Map<ProcessType, JobCostSnapshot[]>()
+  for (const s of snaps) byProcessMap.set(s.process_type, [...(byProcessMap.get(s.process_type) ?? []), s])
+  const byProcess = [...byProcessMap.entries()].map(([type, rows]) => {
+    const packs = sum(rows.map((r) => Number(r.packs_produced)))
     return {
-      res,
-      machine: j.machine_code ?? '—',
-      operator: j.operator_code,
-      shift: j.shift ?? '—',
-      day: (j.complete_at ?? j.created_at).slice(0, 10),
-      qc: ws.filter((w) => /qc/i.test(w.reason)).reduce((s, w) => s + Number(w.grams), 0),
+      type,
+      jobs: rows.length,
+      avgYield: avg(rows.map((r) => Number(r.yield_pct))),
+      avgMinutes: avg(rows.map((r) => Number(r.active_seconds) / 60)),
+      costPerPack: packs ? sum(rows.map((r) => Number(r.total_batch_cost))) / packs : 0,
+      outputKg: sum(rows.map((r) => Number(r.output_weight_g))) / 1000,
     }
   })
 
-  const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0)
-  const groupYield = (keyFn: (p: (typeof perJob)[number]) => string) => {
-    const g = new Map<string, number[]>()
-    for (const p of perJob) {
-      const k = keyFn(p)
-      g.set(k, [...(g.get(k) ?? []), p.res.yieldPct])
-    }
-    return [...g.entries()].map(([key, ys]) => ({ key, yield: avg(ys), jobs: ys.length })).sort((a, b) => a.key.localeCompare(b.key))
-  }
-
-  // output (packs) & cost-per-pack by size — live, weighted by packs across completed jobs
-  const sizeAgg = new Map<number, { packs: number; costSum: number }>()
-  for (const p of perJob) {
-    for (const l of p.res.lines) {
-      const s = sizeAgg.get(l.packSizeG) ?? { packs: 0, costSum: 0 }
-      s.packs += l.actualPacks
-      s.costSum += l.lineTotalCost
-      sizeAgg.set(l.packSizeG, s)
-    }
-  }
-  const outputBySize = [...sizeAgg.entries()].sort((a, b) => a[0] - b[0]).map(([size, v]) => ({ size: `${size}g`, packs: v.packs }))
-  const costBySize = [...sizeAgg.entries()].sort((a, b) => a[0] - b[0]).map(([size, v]) => ({ size: `${size}g`, cost: v.packs ? v.costSum / v.packs : 0 }))
-
-  // wastage breakdown — only completed jobs
-  const wasteReasonAgg = new Map<string, number>()
-  for (const j of completed) for (const w of wasteByJob.get(j.id) ?? []) wasteReasonAgg.set(w.reason, (wasteReasonAgg.get(w.reason) ?? 0) + Number(w.grams))
-  const wastageByReason = [...wasteReasonAgg.entries()].map(([reason, grams]) => ({ reason, grams }))
-
-  // daily yield + QC
-  const dayAgg = new Map<string, { ys: number[]; qc: number }>()
-  for (const p of perJob) {
-    const cur = dayAgg.get(p.day) ?? { ys: [], qc: 0 }
-    cur.ys.push(p.res.yieldPct)
-    cur.qc += p.qc
-    dayAgg.set(p.day, cur)
-  }
-  const daily = [...dayAgg.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([day, v]) => ({
-    day,
-    yield: Number(avg(v.ys).toFixed(1)),
-    qc: v.qc,
-  }))
-
   return {
-    parentCount: d.parents.length,
-    parentWeightG: d.parents.reduce((s, p) => s + toGrams(p.quantity, p.unit), 0),
-    jobsTotal: d.jobs.length,
-    completedCount: completed.length,
-    avgYield: avg(perJob.map((p) => p.res.yieldPct)),
-    avgWastage: avg(perJob.map((p) => p.res.wastagePct)),
-    totalPacks: perJob.reduce((s, p) => s + p.res.lines.reduce((a, l) => a + l.actualPacks, 0), 0),
-    totalValue: perJob.reduce((s, p) => s + p.res.totalBatchCost, 0),
+    inputKg: inputG / 1000,
+    outputKg: outputG / 1000,
+    avgYield: avg(snaps.map((s) => Number(s.yield_pct))),
+    avgWastePct: inputG ? (totalWastageG / inputG) * 100 : 0,
+    totalWastageKg: totalWastageG / 1000,
+    packsProduced: sum(snaps.map((s) => Number(s.packs_produced))),
+    outputValue: sum(snaps.map((s) => Number(s.total_batch_cost))),
+    statusCounts: d.statusCounts,
     outputBySize,
     costBySize,
+    outputDrill,
+    costDrill,
     wastageByReason,
-    daily,
-    byMachine: groupYield((p) => p.machine),
-    byOperator: groupYield((p) => p.operator),
-    byShift: groupYield((p) => p.shift),
+    wastageByProcess,
+    wastageByParent,
+    wastageByCategory,
+    trend,
+    timeByParent,
+    timeByCategory,
+    byProcess,
   }
 }
