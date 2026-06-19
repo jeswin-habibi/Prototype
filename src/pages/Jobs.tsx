@@ -240,7 +240,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
   function confirmQty() {
     if (!qtyFor || !qtyValid) return
     setSelected((s) => ({ ...s, [qtyFor.id]: qtyInput }))
-    setQtyFor(null); setQtyInput('')
+    setQtyFor(null); setQtyInput(''); setOpen(false) // close the parent dropdown after adding
   }
   function removeSelected(id: string) { setSelected((s) => { const n = { ...s }; delete n[id]; return n }) }
 
