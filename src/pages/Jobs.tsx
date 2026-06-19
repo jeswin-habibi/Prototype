@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -183,7 +183,6 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
   const [qtyInput, setQtyInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const footerRef = useRef<HTMLDivElement>(null)
 
   // Default machine/operator to the first active entry once data arrives.
   useEffect(() => {
@@ -396,7 +395,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => { setOpen(false); setTimeout(() => footerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250) }}
+                onClick={() => { setOpen(false); setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 250) }}
               >
                 Done
               </button>
@@ -419,7 +418,7 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
 
       {error && <Banner tone="error"><div className="mt-3">{error}</div></Banner>}
 
-      <div ref={footerRef} className="mt-5 flex items-center gap-2 scroll-mt-20">
+      <div className="mt-5 flex items-center gap-2">
         <span className="text-xs text-slate-400">Date/time &amp; status are captured automatically.</span>
         <button className="btn-primary ml-auto" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create Job'}</button>
       </div>
