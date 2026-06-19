@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, type ComponentType, type ReactNode } from 'react'
+import { Component, Suspense, lazy, useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { isSupabaseConfigured } from './lib/supabase'
 import { NavGuardProvider, useNavGuard } from './lib/navGuard'
@@ -121,6 +121,20 @@ function TabItem({ to, short, icon }: { to: string; short: string; icon: string 
   )
 }
 
+// True while the on-screen keyboard is up (visual viewport noticeably shorter than the layout).
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const onResize = () => setOpen(window.innerHeight - vv.height > 150)
+    vv.addEventListener('resize', onResize)
+    onResize()
+    return () => vv.removeEventListener('resize', onResize)
+  }, [])
+  return open
+}
+
 export default function App() {
   return (
     <NavGuardProvider>
@@ -130,6 +144,7 @@ export default function App() {
 }
 
 function AppShell() {
+  const keyboardOpen = useKeyboardOpen()
   return (
     <div className="min-h-screen">
       {/* Mobile top app bar */}
@@ -184,15 +199,17 @@ function AppShell() {
         </main>
       </div>
 
-      {/* Mobile bottom tab bar */}
-      <nav
-        className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-      >
-        {NAV.map((n) => (
-          <TabItem key={n.to} {...n} />
-        ))}
-      </nav>
+      {/* Mobile bottom tab bar — hidden while typing so the keyboard doesn't push it over content */}
+      {!keyboardOpen && (
+        <nav
+          className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          {NAV.map((n) => (
+            <TabItem key={n.to} {...n} />
+          ))}
+        </nav>
+      )}
     </div>
   )
 }
