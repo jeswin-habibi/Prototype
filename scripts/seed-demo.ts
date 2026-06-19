@@ -126,7 +126,7 @@ interface Input { code: string; batch: string; grams: number }
 interface Spec {
   whenMs: number; processType: 'Machine' | 'Manual'; machine?: string; operator: string
   output: string; size: number; yield: number; durMin: number; holdMin?: number
-  inputs: Input[]; extraWaste?: number; extraReason?: string
+  inputs: Input[]; seed: number
 }
 
 async function completedJob(s: Spec) {
@@ -160,12 +160,23 @@ async function completedJob(s: Spec) {
   }
   const packs = Math.max(1, Math.floor((inputG * s.yield) / s.size))
   const outputG = packs * s.size
+  // Spread the yield loss across QC Rejects + two rotating reasons (varied weights)
+  // so the dashboard's wastage-by-reason pie shows several meaningful slices.
   const wasteTotal = Math.max(0, inputG - outputG)
-  const wasteRows: any[] = []
-  if (s.extraWaste && wasteTotal > s.extraWaste) {
-    wasteRows.push({ reason: 'QC Rejects', grams: Number((wasteTotal - s.extraWaste).toFixed(2)) })
-    wasteRows.push({ reason: s.extraReason ?? 'Shrinkage', grams: s.extraWaste })
-  } else wasteRows.push({ reason: 'QC Rejects', grams: Number(wasteTotal.toFixed(2)) })
+  const others = s.processType === 'Machine'
+    ? ['Shrinkage', 'Machine Loss', 'Moisture Loss', 'Spillage']
+    : ['Shrinkage', 'Spillage', 'Moisture Loss']
+  const a = others[s.seed % others.length]
+  const b = others[(s.seed + 1) % others.length]
+  const w = [[0.35, 0.35, 0.3], [0.4, 0.3, 0.3], [0.3, 0.4, 0.3], [0.38, 0.32, 0.3]][s.seed % 4]
+  const g1 = Math.round(wasteTotal * w[1])
+  const g2 = Math.round(wasteTotal * w[2])
+  const g0 = Math.max(0, Math.round(wasteTotal) - g1 - g2)
+  const wasteRows: any[] = [
+    { reason: 'QC Rejects', grams: g0 },
+    { reason: a, grams: g1 },
+    { reason: b, grams: g2 },
+  ].filter((r) => r.grams > 0)
 
   const machineRate = s.processType === 'Manual' ? 0 : config.machine_cost_per_hour
   const result = calculateCost({
@@ -236,9 +247,7 @@ for (let i = 0; i < N; i++) {
   } else {
     inputs = [{ code: output, batch: chooseBatch(output).batch_id, grams: totalIn }]
   }
-  const extraWaste = i % 5 === 0 ? 400 + (i % 4) * 200 : undefined
-  const extraReason = ['Shrinkage', 'Spillage', 'Moisture Loss', 'Machine Loss'][i % 4]
-  await completedJob({ whenMs, processType, machine, operator, output, size, yield: yieldPct, durMin, holdMin, inputs, extraWaste, extraReason })
+  await completedJob({ whenMs, processType, machine, operator, output, size, yield: yieldPct, durMin, holdMin, inputs, seed: i })
 }
 
 // ─────────────────────────── 6. In-flight jobs (pipeline) ───────────────────────────
@@ -328,6 +337,12 @@ const costPP = (rows: any[]) => { const p = rows.reduce((a, s) => a + Number(s.p
 const mach = snapBy('Machine'), man = snapBy('Manual')
 check('Machine avg yield > Manual avg yield', avgY(mach) > avgY(man), `M ${avgY(mach).toFixed(1)}% vs ${avgY(man).toFixed(1)}%`)
 check('Machine cost/pack < Manual cost/pack', costPP(mach) < costPP(man), `M ${costPP(mach).toFixed(3)} vs ${costPP(man).toFixed(3)}`)
+
+const allWaste: any[] = await q('job_wastage')
+const wAgg: Record<string, number> = {}
+for (const x of allWaste) wAgg[x.reason] = (wAgg[x.reason] ?? 0) + Number(x.grams)
+const wTot = Object.values(wAgg).reduce((a, b) => a + b, 0) || 1
+console.log('Wastage by reason:', Object.entries(wAgg).sort((a, b) => b[1] - a[1]).map(([r, g]) => `${r} ${((g / wTot) * 100).toFixed(0)}%`).join(', '))
 
 // ─────────────────────────── 8. Summary ───────────────────────────
 const passed = results.filter((r) => r.ok).length
