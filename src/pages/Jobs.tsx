@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/useData'
@@ -189,6 +190,14 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
     setMachine((m) => m || refData.machines[0]?.code || '')
     setOperator((o) => o || refData.employees[0]?.code || '')
   }, [refData])
+
+  // Lock background scroll while the qty prompt is open.
+  useEffect(() => {
+    if (!qtyFor) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [qtyFor])
 
   const parentsById = useMemo(() => {
     const map: Record<string, ParentItem> = {}
@@ -416,10 +425,14 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
         <button className="btn-primary ml-auto" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create Job'}</button>
       </div>
 
-      {/* Required-qty prompt (separate box so the value can't be skipped) */}
-      {qtyFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => { setQtyFor(null); setQtyInput('') }}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-lift" onClick={(e) => e.stopPropagation()}>
+      {/* Required-qty prompt — portal to body (bottom sheet on mobile, centred card on desktop) */}
+      {qtyFor && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-slate-900/40 sm:items-center sm:p-4" onClick={() => { setQtyFor(null); setQtyInput('') }}>
+          <div
+            className="w-full max-w-sm rounded-t-2xl bg-white p-4 shadow-lift sm:rounded-2xl"
+            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-sm font-bold text-slate-900">Required quantity</h3>
             <p className="mt-1 text-xs text-slate-500">{qtyFor.item_code} — {qtyFor.description}</p>
             <p className="mt-0.5 text-xs text-slate-400">Available: {formatWeight(remainingG(qtyFor))}</p>
@@ -441,7 +454,8 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
               <button type="button" className="btn-primary" onClick={confirmQty} disabled={!qtyValid}>Add</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </Section>
   )
