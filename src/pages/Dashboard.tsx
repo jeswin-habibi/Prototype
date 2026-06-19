@@ -20,6 +20,7 @@ type WasteRow = {
 }
 interface Bundle {
   snaps: JobCostSnapshot[]; children: ChildRow[]; wastage: WasteRow[]; statusCounts: Record<JobStatus, number>
+  productNames: Record<string, string>
 }
 type Granularity = 'day' | 'month' | 'year'
 type Tab = 'Overview' | 'Production' | 'Cost' | 'Wastage' | 'Time'
@@ -41,16 +42,21 @@ export default function Dashboard() {
       return r
     }
     const countStatus = (s: JobStatus) => supabase.from('repack_jobs').select('id', { count: 'exact', head: true }).eq('status', s)
-    const [snapRes, childRes, wasteRes, cCreated, cProcessing, cHold, cCompleted] = await Promise.all([
+    const [snapRes, childRes, wasteRes, mapRes, cCreated, cProcessing, cHold, cCompleted] = await Promise.all([
       range(supabase.from('job_cost_snapshot').select('*'), 'completed_on'),
       range(supabase.from('child_skus').select('pack_size_g, quantity, unit_cost, total_value, child_item_code, output_product_code, category, created_at'), 'created_at', 'T23:59:59'),
       supabase.from('job_wastage').select('grams, reason, job:repack_jobs(process_type, output_product_code, complete_at, status)'),
+      supabase.from('parent_child_map').select('parent_code, parent_description'),
       countStatus('Created'), countStatus('Processing'), countStatus('On Hold'), countStatus('Completed'),
     ])
+    const productNames: Record<string, string> = {}
+    for (const r of (mapRes.data ?? []) as { parent_code: string; parent_description: string }[])
+      if (r.parent_code && r.parent_description && !productNames[r.parent_code]) productNames[r.parent_code] = r.parent_description
     return {
       snaps: (snapRes.data ?? []) as JobCostSnapshot[],
       children: (childRes.data ?? []) as ChildRow[],
       wastage: (wasteRes.data ?? []) as unknown as WasteRow[],
+      productNames,
       statusCounts: { Created: cCreated.count ?? 0, Processing: cProcessing.count ?? 0, 'On Hold': cHold.count ?? 0, Completed: cCompleted.count ?? 0 },
     }
   }, [from, to])
@@ -270,7 +276,7 @@ function Bars({
     <ResponsiveContainer width="100%" height={230}>
       <BarChart data={data} margin={{ left: -12, right: 8, top: 4 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
-        <XAxis dataKey={xKey} tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={54} />
+        <XAxis dataKey={xKey} tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={54} tickFormatter={(v: string) => (String(v).length > 12 ? `${String(v).slice(0, 11)}…` : String(v))} />
         <YAxis tick={{ fontSize: 11 }} />
         <Tooltip formatter={(v: number) => (isMoney ? money(v, 4) : `${num(v)} ${yLabel}`)} />
         <Bar dataKey={yKey} radius={[4, 4, 0, 0]} cursor={onBarClick ? 'pointer' : undefined}
@@ -287,6 +293,7 @@ function avg(xs: number[]): number { return xs.length ? xs.reduce((a, b) => a + 
 
 function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) {
   const snaps = d.snaps
+  const nameOf = (code: string) => d.productNames[code] ?? code
   const catByProduct: Record<string, string> = {}
   for (const c of d.children) if (c.output_product_code && c.category && !catByProduct[c.output_product_code]) catByProduct[c.output_product_code] = c.category
 
@@ -333,7 +340,7 @@ function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) 
   }
   const wastageByReason = groupSum(waste, (w) => w.reason || 'Unknown', (w) => Number(w.grams)).map((r) => ({ reason: r.label, grams: r.grams }))
   const wastageByProcess = groupSum(waste, (w) => w.job!.process_type, (w) => Number(w.grams))
-  const wastageByParent = groupSum(waste, (w) => w.job!.output_product_code ?? '—', (w) => Number(w.grams)).slice(0, 12)
+  const wastageByParent = groupSum(waste, (w) => w.job!.output_product_code ?? '—', (w) => Number(w.grams)).slice(0, 12).map((r) => ({ ...r, label: nameOf(r.label) }))
   const wastageByCategory = groupSum(waste, (w) => catByProduct[w.job!.output_product_code ?? ''] ?? 'Uncategorized', (w) => Number(w.grams))
 
   const keyOf = (s: JobCostSnapshot) => {
@@ -353,7 +360,7 @@ function computeMetrics(d: Bundle, gran: Granularity, from: string, to: string) 
     for (const s of snaps) { const k = key(s); map.set(k, [...(map.get(k) ?? []), Number(s.active_seconds) / 60]) }
     return [...map.entries()].map(([label, mins]) => ({ label, minutes: Number(avg(mins).toFixed(1)) })).sort((a, b) => b.minutes - a.minutes).slice(0, 12)
   }
-  const timeByParent = timeGroup((s) => s.output_product_code ?? '—')
+  const timeByParent = timeGroup((s) => s.output_product_code ?? '—').map((r) => ({ ...r, label: nameOf(r.label) }))
   const timeByCategory = timeGroup((s) => catByProduct[s.output_product_code ?? ''] ?? 'Uncategorized')
 
   const byProcessMap = new Map<ProcessType, JobCostSnapshot[]>()
