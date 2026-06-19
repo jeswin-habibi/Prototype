@@ -11,7 +11,9 @@ Last updated: **2026-06-19**
 > **inputs-as-a-list (`job_parents`) + a declared output product (`parent_child_map`)**, with an
 > On-Hold lifecycle, snapshot-based dashboard, and accounts (5 phases — see Iteration Log).
 > New schema columns/tables are added **alongside** legacy ones so screens migrate phase-by-phase.
-> **Phase 1 done:** new data model + Parent-Child Master + editable Receipt grid.
+> **Phases 1–2 done:** new data model + Parent-Child Master + editable Receipt grid (P1);
+> multi-parent/blend job flow with On-Hold active-time tracking, master-driven child SKUs, and
+> cost snapshots (P2). Pending: Records split (P3), new Dashboard (P4), scale + auth (P5).
 
 ---
 
@@ -65,6 +67,9 @@ src/
     useData.ts                 useData(loader, deps) → {data, loading, error, refresh}
     cost.ts                    PURE cost engine (calculateCost, hoursBetween)
     cost.test.ts               Unit tests (consistency: Σ per-pack = total batch cost)
+    time.ts                    activeSeconds()/formatDuration() — active processing time from events
+    time.test.ts               Unit tests (On-Hold gaps excluded)
+    childMap.ts                resolveChild()/childExpiry() — child identity from Parent-Child Master
     excel.ts                   parseParentWorkbook/parseParentChildMap, downloadTemplate, exportRows, exportChildRecords
     parent.ts                  parentRow()/parentTotalWeightG() — receipt derive + legacy mirror
     units.ts                   toGrams(), formatWeight()
@@ -145,12 +150,16 @@ future report. `Dashboard.computeMetrics()` is likewise pure.
 Data access pattern: pages call `useData(loader, deps)` for reads; mutations call `supabase.from(...)`
 directly then `refresh()`. No global store — each page owns its data. Masters drive every dropdown.
 
-**Job lifecycle** (`JobDetail.tsx`), gated by `repack_jobs.status`:
-1. **Created** — plan output mix: add `job_pack_sizes` rows, edit `expected_packs` (auto `expected_output_g`). Shows total parent weight. → **Start Processing** sets `start_at`, `shift = shiftFromIso(now)`, status `Processing`.
-2. **Processing** — enter `actual_packs` per line (auto `actual_output_g`). → **Complete Processing** sets `complete_at`, status `Completed`.
-3. **Completed** — wastage entry, Output Summary, Costing sheet, and **Generate Child SKUs** (idempotent: deletes existing `child_skus` for the job then inserts fresh).
+**Job creation** (`Jobs.tsx`): pick **Machine|Manual** (Manual hides the machine field, machine_code null); operator (+machine) default to the first active master, editable. **Multi-parent picker**: parents listed earliest-expiry-first, searchable, each checkbox takes a **weight to draw** capped at the parent's **remaining** weight (`total_weight_g − Σ job_parents`); writes `job_parents` rows. **Output product** defaults to the single input's `item_code`; if inputs span products it's a **blend** and the user picks the output product (any `parent_child_map` code). Legacy `parent_item_id` is set to the primary input for back-compat.
 
-**Code generation** (`codes.ts`): `child_item_code = {parent.item_code}-{size}G`; `batch_id = {parent.batch_id}CH0n` (n = pack-line index+1); `unit = 'pack'`; expiry + warehouse inherited from parent.
+**Job lifecycle** (`JobDetail.tsx`), gated by `repack_jobs.status` (planned-output step removed):
+1. **Created** — shows inputs (job_parents) + output product. → **Start Processing** logs a `start` event, sets `start_at`, `shift`, status `Processing`.
+2. **Processing** — **Hold** (`hold` event, status `On Hold`) / **Resume** (`resume` event) / **Stop** (`stop` event, `complete_at`, status `Completed`). **Active time** = `activeSeconds(job_time_events)` (On-Hold excluded), ticking live while Processing.
+3. **Completed** — enter **Actual Produced Items** (add pack-size lines + packs), **Wastage** (auto-seeds one `QC Rejects` row = remaining grams; editable; "+ QC Rejects (remaining)" shortcut), Output Summary (input/output/yield/lost-yield/wastage-kg/time/packs) + Costing (machine cost **0 if Manual**), then **Generate Child SKUs**.
+
+**Cost inputs now**: `inputWeightG = Σ job_parents.required_weight_g`, `parentMaterialCost = Σ job_parents.material_cost`, `machineHours = activeSeconds/3600`, `machineCostPerHour = 0` when Manual. Engine (`cost.ts`) unchanged.
+
+**Child identity** (`childMap.ts::resolveChild`): looked up in `parent_child_map` by **(output_product_code, pack_size_g)** → `child_code/description/barcode/category` (falls back to generated `codes.ts`). `batch_id = childBatchId(single-input batch | output code, idx)`; expiry = single input's, or the **latest** across inputs (`childExpiry`); warehouse from primary input. **Generate** is idempotent (deletes job's `child_skus` first) and writes a **`job_cost_snapshot`** (upsert on `job_id`) + caches `active_seconds`.
 
 **Shift** is derived (not captured): Morning 06–14 / Afternoon 14–22 / Night 22–06 from `start_at`.
 
@@ -186,7 +195,8 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 ---
 
 ## 9. Known Limitations / Backlog
-- Whole parent batch assumed as input (no partial-batch repacking yet).
+- ~~Whole parent batch assumed as input~~ → **resolved (P2):** jobs draw partial weights from multiple parents (`job_parents`).
+- Parent-balance check (remaining weight) is computed client-side at create time; an atomic `consume_parent` RPC for concurrent operators is a Phase 5 hardening.
 - Single global machine/labor rate (per-machine override field exists, used if set).
 - No auth/roles (open prototype).
 - JS bundle is large (~1.2 MB: xlsx + recharts) — not code-split yet.
@@ -197,6 +207,7 @@ page. Cost-per-pack by size is a packs-weighted average across completed jobs; `
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-19** — **Restructure Phase 2**: multi-parent/blend job flow. `Jobs.tsx` create form rebuilt (Machine/Manual, searchable expiry-sorted multi-parent picker with per-parent weight draw capped at remaining, output-product/blend selection → `job_parents`). `JobDetail.tsx` rewritten: planned-output removed; **Start/Hold/Resume/Stop** logged to `job_time_events` with **active-time** costing (`time.ts`, On-Hold excluded); post-stop actual pack lines; auto **QC Rejects** wastage = remaining; Manual ⇒ machine cost 0; child SKUs resolved from `parent_child_map` (`childMap.ts`, latest expiry for blends) + **`job_cost_snapshot`** written. New `time.ts`/`time.test.ts`, `childMap.ts`. (NB: the legacy `Dashboard.tsx` still reads single-parent fields — accurate for single-parent jobs, approximate for blends — until the Phase 4 snapshot-based rebuild.)
 - **2026-06-19** — **Restructure Phase 1** (branch `restructure/multi-parent-blends`): new data model added alongside legacy (tables `parent_child_map`, `job_parents`, `job_time_events`, `job_cost_snapshot`; new columns on `parent_items`/`repack_jobs`/`child_skus`; `'On Hold'` status; indexes). New reusable **`DataGrid`** (CRUD + Import/Template/Export, supersedes `MasterEditor`). **Config** gains the **Parent-Child Master**. **Receipt** rebuilt as an inline-editable grid (import/template/export) with `parent.ts::parentRow()` deriving the legacy mirror. `excel.ts` generalized (`parseParentChildMap`, `downloadTemplate`, `exportRows`). Phases 2–5 (multi-parent job flow + On-Hold, Records split, new Dashboard, scale+auth) pending. _(plan: `~/.claude/plans/i-want-to-make-declarative-sunrise.md`)_
 - **2026-06-15** — Visual redesign: Inter font, brand teal scale + soft shadows, gradient body background, gradient buttons/brand marks, icon-chip stat cards, accent section headers, dotted status badges, polished nav active states.
 - **2026-06-15** — Mobile UX: app-style **bottom tab bar** + mobile top app bar (desktop keeps the sidebar); browse screens (Jobs, Records, Receipt) render as **cards on mobile**, tables on `md+`. `Stat` gained `valueClassName`.

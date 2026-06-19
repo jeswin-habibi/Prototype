@@ -92,7 +92,7 @@ export interface RepackJob {
   start_at: string | null
   complete_at: string | null
   active_seconds: number | null
-  parent?: ParentItem
+  parent?: ParentItem | null
 }
 
 /** One parent batch consumed by a job (the input list). */
