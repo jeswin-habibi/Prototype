@@ -163,8 +163,11 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
   const [machine, setMachine] = useState('')
   const [operator, setOperator] = useState('')
   const [outputProduct, setOutputProduct] = useState('')
-  const [selected, setSelected] = useState<Record<string, string>>({}) // parentId → grams string
+  const [selected, setSelected] = useState<Record<string, string>>({}) // parentId → kg string
   const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false) // parent dropdown open
+  const [qtyFor, setQtyFor] = useState<ParentItem | null>(null) // parent awaiting a qty entry
+  const [qtyInput, setQtyInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -187,10 +190,11 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
     (refData?.parents ?? []).some((o) => o.item_code === p.item_code && o.id !== p.id && remainingG(o) > 0 && !!o.expiry_date && !!p.expiry_date && o.expiry_date < p.expiry_date)
 
   const selectedEntries = Object.entries(selected).filter(([, w]) => Number(w) > 0)
+  const totalDrawnG = selectedEntries.reduce((s, [, w]) => s + (Number(w) || 0) * 1000, 0)
   const selectedCodes = [...new Set(selectedEntries.map(([pid]) => parentsById[pid]?.item_code).filter(Boolean))]
   const defaultOutput = selectedCodes.length === 1 ? selectedCodes[0] : ''
-  const isBlend = selectedCodes.length > 1
   const effectiveOutput = outputProduct || defaultOutput
+  const showOutput = selectedEntries.length > 1 // only a mix needs a chosen output product
 
   const outputOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -200,24 +204,31 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
     return opts
   }, [refData, selectedCodes, selected, parentsById])
 
-  function toggle(p: ParentItem) {
-    setSelected((s) => {
-      const next = { ...s }
-      if (p.id in next) delete next[p.id]
-      else next[p.id] = ''
-      return next
-    })
+  const qtyMaxKg = qtyFor ? remainingG(qtyFor) / 1000 : 0
+  const qtyValid = Number(qtyInput) > 0 && Number(qtyInput) <= qtyMaxKg + 1e-9
+
+  function onCheck(p: ParentItem) {
+    if (p.id in selected) {
+      setSelected((s) => { const n = { ...s }; delete n[p.id]; return n }) // uncheck → remove
+    } else {
+      setQtyInput('') // checking a new parent → prompt for the draw qty
+      setQtyFor(p)
+    }
   }
-  function setWeight(id: string, v: string) {
-    setSelected((s) => ({ ...s, [id]: v }))
+  function editQty(p: ParentItem) { setQtyInput(selected[p.id] ?? ''); setQtyFor(p) }
+  function confirmQty() {
+    if (!qtyFor || !qtyValid) return
+    setSelected((s) => ({ ...s, [qtyFor.id]: qtyInput }))
+    setQtyFor(null); setQtyInput('')
   }
+  function removeSelected(id: string) { setSelected((s) => { const n = { ...s }; delete n[id]; return n }) }
 
   async function create() {
     setError(null)
     if (!operator) return setError('Select an operator.')
     if (processType === 'Machine' && !machine) return setError('Select a machine.')
-    if (selectedEntries.length === 0) return setError('Select at least one parent and enter a weight to draw.')
-    if (!effectiveOutput) return setError('Select the output product for this blend.')
+    if (selectedEntries.length === 0) return setError('Select at least one parent.')
+    if (!effectiveOutput) return setError('Select the output product for this mix.')
     for (const [pid, w] of selectedEntries) {
       const p = parentsById[pid]
       const rem = remainingG(p)
@@ -263,6 +274,10 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
     if (!q) return true
     return p.description.toLowerCase().includes(q) || p.item_code.toLowerCase().includes(q)
   })
+  const bigBtn = (active: boolean) =>
+    `flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 py-6 text-base font-bold transition ${
+      active ? 'border-brand bg-brand-50 text-brand-700 shadow-soft' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+    }`
 
   return (
     <Section title="Create Job">
@@ -270,131 +285,142 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
         <Banner tone="warn">No parent items yet — receive some on the Parent Receipt screen first.</Banner>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div>
-          <label className="label">Processing</label>
-          <select className="input" value={processType} onChange={(e) => setProcessType(e.target.value as ProcessType)}>
-            <option value="Machine">Machine</option>
-            <option value="Manual">Manual</option>
-          </select>
-        </div>
+      {/* Process type — big buttons */}
+      <div className="grid grid-cols-2 gap-3">
+        <button type="button" className={bigBtn(processType === 'Machine')} onClick={() => setProcessType('Machine')}>
+          <span className="text-2xl" aria-hidden>🛠️</span>
+          Machine
+        </button>
+        <button type="button" className={bigBtn(processType === 'Manual')} onClick={() => setProcessType('Manual')}>
+          <span className="text-2xl" aria-hidden>✋</span>
+          Manual
+        </button>
+      </div>
+
+      {/* Machine line + operator */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {processType === 'Machine' && (
           <div>
             <label className="label">Machine</label>
             <select className="input" value={machine} onChange={(e) => setMachine(e.target.value)}>
-              {refData.machines.map((m) => (
-                <option key={m.id} value={m.code}>{m.code}</option>
-              ))}
+              {refData.machines.map((m) => (<option key={m.id} value={m.code}>{m.code}</option>))}
             </select>
           </div>
         )}
         <div>
           <label className="label">Operator</label>
           <select className="input" value={operator} onChange={(e) => setOperator(e.target.value)}>
-            {refData.employees.map((e) => (
-              <option key={e.id} value={e.code}>{e.code} — {e.name}</option>
-            ))}
+            {refData.employees.map((e) => (<option key={e.id} value={e.code}>{e.code} — {e.name}</option>))}
           </select>
         </div>
       </div>
 
-      {/* Parent multi-select */}
+      {/* Parent selection — dropdown */}
       <div className="mt-5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <label className="label mb-0">Parents (earliest expiry first)</label>
-          <input
-            className="input max-w-[220px]"
-            placeholder="Search description / ID…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="max-h-72 overflow-auto rounded-lg border border-slate-200">
-          <table className="w-full">
-            <thead className="sticky top-0 bg-slate-50">
-              <tr className="border-b border-slate-200">
-                <th className="th" />
-                <th className="th">Parent ID</th>
-                <th className="th">Description</th>
-                <th className="th">Qty</th>
-                <th className="th">Remaining</th>
-                <th className="th">Expiry</th>
-                <th className="th">Draw (kg)</th>
-              </tr>
-            </thead>
-            <tbody>
+        <label className="label">Parents</label>
+        <button type="button" className="input flex items-center justify-between text-left" onClick={() => setOpen((v) => !v)}>
+          <span className={selectedEntries.length ? 'text-slate-800' : 'text-slate-400'}>
+            {selectedEntries.length ? `${selectedEntries.length} selected • ${formatWeight(totalDrawnG)}` : 'Click to select parents…'}
+          </span>
+          <span className="text-slate-400">{open ? '▴' : '▾'}</span>
+        </button>
+
+        {/* selected chips */}
+        {selectedEntries.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {selectedEntries.map(([pid, w]) => (
+              <span key={pid} className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700">
+                <button type="button" className="font-medium" onClick={() => editQty(parentsById[pid])}>{parentsById[pid]?.item_code}: {w} kg</button>
+                <button type="button" className="text-brand-700/60 hover:text-rose-600" onClick={() => removeSelected(pid)} aria-label="Remove">✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* dropdown panel */}
+        {open && (
+          <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 shadow-card">
+            <div className="border-b border-slate-100 p-2">
+              <input className="input" autoFocus placeholder="Search description / ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <div className="max-h-64 overflow-auto">
               {filtered.length === 0 ? (
-                <tr><td className="td text-slate-400" colSpan={7}>No parents match.</td></tr>
+                <div className="p-3 text-sm text-slate-400">No parents match.</div>
               ) : (
                 filtered.map((p) => {
                   const checked = p.id in selected
                   const rem = remainingG(p)
                   return (
-                    <tr key={p.id} className={`border-b border-slate-100 ${checked ? 'bg-brand-50/40' : ''}`}>
-                      <td className="td">
-                        <input type="checkbox" checked={checked} onChange={() => toggle(p)} disabled={rem <= 0 && !checked} />
-                      </td>
-                      <td className="td font-medium">{p.item_code}</td>
-                      <td className="td">{p.description}</td>
-                      <td className="td">{p.qty}</td>
-                      <td className={`td ${rem <= 0 ? 'text-rose-500' : ''}`}>{formatWeight(rem)}</td>
-                      <td className="td">{dateOnly(p.expiry_date)}</td>
-                      <td className="td">
-                        {checked && (
-                          <div>
-                            <input
-                              className="input max-w-[110px]"
-                              type="number"
-                              step="0.1"
-                              value={selected[p.id]}
-                              max={rem / 1000}
-                              placeholder={`≤ ${(rem / 1000).toFixed(1)}`}
-                              onChange={(e) => setWeight(p.id, e.target.value)}
-                            />
-                            {fefoWarn(p) && <div className="mt-1 text-[11px] font-medium text-amber-600">⚠ Earlier-expiry batch in stock</div>}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                    <label key={p.id} className={`flex cursor-pointer items-center gap-3 border-b border-slate-50 px-3 py-2 ${checked ? 'bg-brand-50/40' : 'hover:bg-slate-50'}`}>
+                      <input type="checkbox" className="h-4 w-4 shrink-0" checked={checked} disabled={rem <= 0 && !checked} onChange={() => onCheck(p)} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-slate-800">{p.item_code}</span>
+                          <span className={`text-xs ${rem <= 0 ? 'text-rose-500' : 'text-slate-500'}`}>{formatWeight(rem)} left</span>
+                        </span>
+                        <span className="block truncate text-xs text-slate-500">{p.description}</span>
+                        <span className="block text-[11px] text-slate-400">
+                          Exp {dateOnly(p.expiry_date)}{fefoWarn(p) && <span className="ml-1 text-amber-600">• earlier-expiry batch in stock</span>}
+                        </span>
+                      </span>
+                    </label>
                   )
                 })
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+            <div className="flex justify-end border-t border-slate-100 p-2">
+              <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Done</button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Output product */}
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="label">Output product {isBlend && <span className="text-amber-600">(blend — pick one)</span>}</label>
+      {/* Output product — only for a mix (more than one parent) */}
+      {showOutput && (
+        <div className="mt-4">
+          <label className="label">Output product</label>
           <select className="input" value={effectiveOutput} onChange={(e) => setOutputProduct(e.target.value)}>
             <option value="">Select…</option>
-            {outputOptions.map((o) => (
-              <option key={o.code} value={o.code}>{o.code}{o.description ? ` — ${o.description}` : ''}</option>
-            ))}
+            {outputOptions.map((o) => (<option key={o.code} value={o.code}>{o.code}{o.description ? ` — ${o.description}` : ''}</option>))}
           </select>
-          <p className="mt-1 text-xs text-slate-500">
-            {isBlend
-              ? 'Different products selected — choose the blend this job produces.'
-              : 'Defaults to the selected parent’s product; child SKUs come from the Parent-Child Master.'}
-          </p>
+          <p className="mt-1 text-xs text-slate-500">Multiple parents selected — choose the product this job produces.</p>
         </div>
-        <div className="self-end text-sm text-slate-500">
-          {selectedEntries.length > 0 && (
-            <span>{selectedEntries.length} parent(s), drawing {formatWeight(selectedEntries.reduce((s, [, w]) => s + (Number(w) || 0) * 1000, 0))}.</span>
-          )}
-        </div>
-      </div>
+      )}
 
       {error && <Banner tone="error"><div className="mt-3">{error}</div></Banner>}
 
-      <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-        <span>Date/time &amp; status (Created) are captured automatically.</span>
-        <button className="btn-primary ml-auto" onClick={create} disabled={busy}>
-          {busy ? 'Creating…' : 'Create Job'}
-        </button>
+      <div className="mt-5 flex items-center gap-2">
+        <span className="text-xs text-slate-400">Date/time &amp; status are captured automatically.</span>
+        <button className="btn-primary ml-auto" onClick={create} disabled={busy}>{busy ? 'Creating…' : 'Create Job'}</button>
       </div>
+
+      {/* Required-qty prompt (separate box so the value can't be skipped) */}
+      {qtyFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={() => { setQtyFor(null); setQtyInput('') }}>
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-lift" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-slate-900">Required quantity</h3>
+            <p className="mt-1 text-xs text-slate-500">{qtyFor.item_code} — {qtyFor.description}</p>
+            <p className="mt-0.5 text-xs text-slate-400">Available: {formatWeight(remainingG(qtyFor))}</p>
+            <label className="label mt-3">Weight to draw (kg)</label>
+            <input
+              className="input"
+              type="number"
+              step="0.1"
+              autoFocus
+              value={qtyInput}
+              max={qtyMaxKg}
+              placeholder={`≤ ${qtyMaxKg.toFixed(1)}`}
+              onChange={(e) => setQtyInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') confirmQty() }}
+            />
+            {qtyInput !== '' && !qtyValid && <div className="mt-1 text-xs text-rose-600">Enter a value between 0 and {qtyMaxKg.toFixed(1)} kg.</div>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => { setQtyFor(null); setQtyInput('') }}>Cancel</button>
+              <button type="button" className="btn-primary" onClick={confirmQty} disabled={!qtyValid}>Add</button>
+            </div>
+          </div>
+        </div>
+      )}
     </Section>
   )
 }
