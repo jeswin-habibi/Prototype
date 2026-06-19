@@ -1,16 +1,54 @@
-import { Suspense, lazy } from 'react'
+import { Component, Suspense, lazy, type ComponentType, type ReactNode } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { isSupabaseConfigured } from './lib/supabase'
 import { NavGuardProvider, useNavGuard } from './lib/navGuard'
 import { Banner, Spinner } from './components/ui'
 
 // Lazy-load pages so the heavy chart/xlsx code only loads when its screen is opened.
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const Receipt = lazy(() => import('./pages/Receipt'))
-const Jobs = lazy(() => import('./pages/Jobs'))
-const JobDetail = lazy(() => import('./pages/JobDetail'))
-const Records = lazy(() => import('./pages/Records'))
-const Config = lazy(() => import('./pages/Config'))
+// If a chunk fails to load — usually because a new deploy replaced the hashed file while
+// an old tab was still open — reload once instead of showing a blank screen.
+function lazyWithRetry<T extends ComponentType>(factory: () => Promise<{ default: T }>) {
+  return lazy(async () => {
+    const KEY = 'chunk-reloaded'
+    try {
+      const mod = await factory()
+      sessionStorage.removeItem(KEY)
+      return mod
+    } catch (err) {
+      if (!sessionStorage.getItem(KEY)) {
+        sessionStorage.setItem(KEY, '1')
+        window.location.reload()
+        return new Promise<{ default: T }>(() => {}) // never resolves; the page is reloading
+      }
+      throw err
+    }
+  })
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch(err: unknown) { console.error('App error boundary caught:', err) }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="px-4 py-16 text-center">
+          <p className="mb-1 text-sm font-semibold text-slate-700">This screen didn’t load.</p>
+          <p className="mb-4 text-xs text-slate-400">A new version may be available.</p>
+          <button className="btn-primary mx-auto" onClick={() => window.location.reload()}>Reload</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'))
+const Receipt = lazyWithRetry(() => import('./pages/Receipt'))
+const Jobs = lazyWithRetry(() => import('./pages/Jobs'))
+const JobDetail = lazyWithRetry(() => import('./pages/JobDetail'))
+const Records = lazyWithRetry(() => import('./pages/Records'))
+const Config = lazyWithRetry(() => import('./pages/Config'))
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', short: 'Home', icon: '📊' },
@@ -129,18 +167,20 @@ function AppShell() {
               <code className="rounded bg-rose-100 px-1">.env.example</code>).
             </Banner>
           )}
-          <Suspense fallback={<Spinner />}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/receipt" element={<Receipt />} />
-              <Route path="/jobs" element={<Jobs />} />
-              <Route path="/jobs/:id" element={<JobDetail />} />
-              <Route path="/records" element={<Records />} />
-              <Route path="/config" element={<Config />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense fallback={<Spinner />}>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/receipt" element={<Receipt />} />
+                <Route path="/jobs" element={<Jobs />} />
+                <Route path="/jobs/:id" element={<JobDetail />} />
+                <Route path="/records" element={<Records />} />
+                <Route path="/config" element={<Config />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
 
