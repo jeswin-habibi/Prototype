@@ -78,8 +78,8 @@ function SideItem({ to, label, icon }: { to: string; label: string; icon: string
       className={({ isActive }) =>
         `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${
           isActive
-            ? 'bg-gradient-to-r from-brand to-brand-dark text-white shadow-soft'
-            : 'text-slate-600 hover:bg-slate-100'
+            ? 'bg-brand text-white shadow-soft'
+            : 'text-slate-300 hover:bg-white/5 hover:text-white'
         }`
       }
     >
@@ -99,8 +99,8 @@ function TabItem({ to, short, icon }: { to: string; short: string; icon: string 
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
-        `flex flex-col items-center justify-center gap-1 py-2 text-[11px] font-semibold transition ${
-          isActive ? 'text-brand-700' : 'text-slate-400'
+        `flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-semibold transition ${
+          isActive ? 'text-brand-light' : 'text-slate-400'
         }`
       }
     >
@@ -108,7 +108,7 @@ function TabItem({ to, short, icon }: { to: string; short: string; icon: string 
         <>
           <span
             className={`flex h-7 w-12 items-center justify-center rounded-full text-lg leading-none transition ${
-              isActive ? 'bg-brand-50' : 'opacity-70'
+              isActive ? 'bg-brand/20' : 'opacity-70'
             }`}
             aria-hidden
           >
@@ -135,6 +135,22 @@ function useKeyboardOpen() {
   return open
 }
 
+// Light/dark theme, persisted. (Full dark styling lands with the dark-mode reference.)
+function useTheme() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try { return (localStorage.getItem('theme') as 'light' | 'dark') || 'light' } catch { return 'light' }
+  })
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    try { localStorage.setItem('theme', theme) } catch { /* ignore */ }
+  }, [theme])
+  return [theme, () => setTheme((t) => (t === 'light' ? 'dark' : 'light'))] as const
+}
+
+function Logo({ className }: { className?: string }) {
+  return <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="Re-Pack IQ" className={className} />
+}
+
 export default function App() {
   return (
     <NavGuardProvider>
@@ -145,21 +161,29 @@ export default function App() {
 
 function AppShell() {
   const keyboardOpen = useKeyboardOpen()
+  const [theme, toggleTheme] = useTheme()
   return (
     <div className="min-h-screen">
-      {/* Mobile top app bar */}
-      <header className="sticky top-0 z-20 flex items-center gap-2.5 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur md:hidden">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-light to-brand text-white shadow-soft">📦</div>
-        <div className="text-sm font-bold text-slate-900">Re-Pack IQ</div>
+      {/* Mobile top app bar — dark chrome */}
+      <header className="sticky top-0 z-20 flex items-center gap-2.5 bg-ink-900 px-4 py-3 text-white md:hidden">
+        <Logo className="h-8 w-8 rounded-lg" />
+        <div className="text-base font-bold">Re-Pack IQ</div>
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle dark mode"
+          className="ml-auto flex h-9 w-9 items-center justify-center rounded-full border border-white/15 text-base hover:bg-white/10"
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
       </header>
 
       <div className="md:flex">
-        {/* Desktop sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-slate-200 bg-white/80 backdrop-blur md:flex">
+        {/* Desktop sidebar — dark chrome */}
+        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-ink-900 text-white md:flex">
           <div className="flex items-center gap-2.5 px-4 py-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-light to-brand text-lg text-white shadow-soft">📦</div>
+            <Logo className="h-9 w-9 rounded-lg" />
             <div>
-              <div className="text-sm font-bold leading-tight text-slate-900">Re-Pack IQ</div>
+              <div className="text-sm font-bold leading-tight">Re-Pack IQ</div>
               <div className="text-xs text-slate-400">Smart repacking</div>
             </div>
           </div>
@@ -168,10 +192,18 @@ function AppShell() {
               <SideItem key={n.to} {...n} />
             ))}
           </nav>
+          <div className="mt-auto px-3 pb-5">
+            <button
+              onClick={toggleTheme}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5"
+            >
+              {theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode'}
+            </button>
+          </div>
         </aside>
 
-        {/* Page content. Extra bottom padding on mobile clears the tab bar. */}
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-5 md:px-6 md:pb-10 md:pt-6">
+        {/* Page content. Extra bottom padding on mobile clears the floating tab bar. */}
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 md:px-6 md:pb-10 md:pt-6">
           {!isSupabaseConfigured && (
             <Banner tone="error">
               <strong>Supabase not configured.</strong> Create a project at supabase.com, run{' '}
@@ -199,11 +231,11 @@ function AppShell() {
         </main>
       </div>
 
-      {/* Mobile bottom tab bar — hidden while typing so the keyboard doesn't push it over content */}
+      {/* Mobile bottom nav — floating dark bar; hidden while typing so the keyboard doesn't push it over content */}
       {!keyboardOpen && (
         <nav
-          className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          className="fixed inset-x-3 z-20 grid grid-cols-5 rounded-2xl bg-ink-900 shadow-lift md:hidden"
+          style={{ bottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
         >
           {NAV.map((n) => (
             <TabItem key={n.to} {...n} />

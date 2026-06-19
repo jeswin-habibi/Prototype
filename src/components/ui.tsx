@@ -5,8 +5,8 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+        <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
@@ -17,7 +17,7 @@ export function Section({ title, children, actions }: { title: string; children:
   return (
     <section className="card mb-4">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2.5 text-sm font-bold uppercase tracking-wide text-slate-700">
+        <h2 className="flex items-center gap-2.5 text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
           <span className="h-4 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" />
           {title}
         </h2>
@@ -29,10 +29,10 @@ export function Section({ title, children, actions }: { title: string; children:
 }
 
 const TONE_TEXT = {
-  default: 'text-slate-900',
-  good: 'text-emerald-600',
-  warn: 'text-amber-600',
-  bad: 'text-rose-600',
+  default: 'text-slate-900 dark:text-white',
+  good: 'text-emerald-600 dark:text-emerald-400',
+  warn: 'text-amber-600 dark:text-amber-400',
+  bad: 'text-rose-600 dark:text-rose-400',
 }
 const TONE_CHIP = {
   default: 'bg-brand-50 text-brand-700',
@@ -57,7 +57,7 @@ export function Stat({
   icon?: ReactNode
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card transition hover:shadow-lift">
+    <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card transition hover:shadow-lift dark:border-ink-700/70 dark:bg-ink-800">
       {icon && <div className={`icon-chip ${TONE_CHIP[tone]}`}>{icon}</div>}
       <div className="min-w-0">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
@@ -91,8 +91,24 @@ export function StatusBadge({ status }: { status: JobStatus }) {
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-10 text-center text-sm text-slate-500">
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-4 py-10 text-center text-sm text-slate-500 dark:border-ink-700 dark:bg-ink-800/40 dark:text-slate-400">
       {children}
+    </div>
+  )
+}
+
+/** Dark totals strip (e.g. page-bottom summary). 2-up on mobile, 4-up on desktop. */
+export function SummaryBar({ items }: { items: { icon?: ReactNode; label: string; value: ReactNode; sub?: string }[] }) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-ink-800 shadow-card sm:grid-cols-4">
+      {items.map((it, i) => (
+        <div key={i} className="bg-ink-900 px-4 py-3.5">
+          {it.icon && <div className="mb-2 flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-sm text-brand-light">{it.icon}</div>}
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{it.label}</div>
+          <div className="text-base font-extrabold leading-tight text-white sm:text-lg">{it.value}</div>
+          {it.sub && <div className="mt-0.5 text-[10px] text-slate-500">{it.sub}</div>}
+        </div>
+      ))}
     </div>
   )
 }
