@@ -105,6 +105,26 @@ export function IconExport({ className }: P) {
   )
 }
 
+export function IconUpload({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 9l5-5 5 5" />
+      <path d="M12 4v12" />
+    </svg>
+  )
+}
+
+export function IconDownload({ className }: P) {
+  return (
+    <svg {...svg(className)}>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 11l5 5 5-5" />
+      <path d="M12 16V4" />
+    </svg>
+  )
+}
+
 export function IconTrendUp({ className }: P) {
   return (
     <svg {...svg(className)}>

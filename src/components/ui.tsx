@@ -18,19 +18,25 @@ export function Section({
   title,
   children,
   actions,
+  icon,
   collapsible,
   defaultOpen = true,
 }: {
-  title: string
+  title: ReactNode
   children: ReactNode
   actions?: ReactNode
+  icon?: ReactNode
   collapsible?: boolean
   defaultOpen?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
   const heading = (
     <h2 className="flex items-center gap-2.5 text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
-      <span className="h-4 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" />
+      {icon ? (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand-light">{icon}</span>
+      ) : (
+        <span className="h-4 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" />
+      )}
       {title}
     </h2>
   )

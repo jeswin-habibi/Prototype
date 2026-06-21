@@ -62,7 +62,7 @@ src/
   types.ts                     DB row types (mirror schema.sql)
   index.css                    Tailwind + .btn/.card/.input/.th/.td component classes
   components/ui.tsx            PageHeader, Section, Stat, StatusBadge, Empty, Spinner, Banner
-  components/DataGrid.tsx      Reusable inline-edit grid: CRUD + Import/Template/Export (+deriveRow)
+  components/DataGrid.tsx      Reusable inline-edit grid: CRUD + Import/Template/Export (+deriveRow; opt-in rich toolbar via `icon`)
   lib/
     supabase.ts                Client + isSupabaseConfigured flag
     useData.ts                 useData(loader, deps) → {data, loading, error, refresh}
@@ -214,6 +214,7 @@ set; moving it into a Postgres RPC / materialized view is the Phase 5 scale step
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-21** — **DataGrid rich toolbar**: opt-in via a new `icon` prop on `<DataGrid>` (gated, so the 6 Config grids are unchanged). When set, the section header shows an **icon badge + two-tone heading** (first word brand-teal, rest white) and the Import/Template/Export/Add actions become a **2×2 button grid with icon chips** (`IconUpload`/`IconDownload`) and a left divider; **+ Add** stays the filled gradient primary. `Section.title` widened to `ReactNode`; Receipt passes `icon={<IconBox/>}`.
 - **2026-06-19** — **Mobile polish + fixes**: On-Hold jobs no longer block navigation (only active Processing locks; Cancel still available while in progress). Dashboard: fixed Cost-tab horizontal overflow (`grid-cols-1` base on tab grids), **denser 4-up KPI tiles** with abbreviated values, **status pipeline corrected** (Created = total jobs; others = current status), wastage pie uses a **legend** (labels no longer overlap). JobDetail Output Summary + Cost sheet **compressed** (compact `Mini` tiles, tighter tables). Config **Parent-Child Master is now collapsed behind a button**. Seeder differentiates process: **machines run higher yield + throughput** so the Manual-vs-Machine view shows machine yield ↑ and cost/pack ↓ (verified: 95.4% vs 88.5%, 3.10 vs 3.69).
 - **2026-06-19** — **Dark theme + icon system**: implemented the dark theme (darkened `ink` palette; dark-aware charts via `useIsDark` + `chartColors` — grid/axis/tooltip). Inline SVG icon set (`components/icons.tsx`) replaces all emoji (toggle, nav, KPI chips, record cards). Dashboard KPIs are icon-chip cards (colored accents); the **job pipeline** is a highlighted panel (per-status colors + icons). Currency shows **KWD** (no `$`); "value" uses a coins icon. Nav icons: home/receipt/clipboard/records/gear.
 - **2026-06-19** — **Visual rebrand (light mode)**: emerald accent + **dark-navy chrome** (header/sidebar/floating bottom-nav). Theme toggle (sun/moon) replaces any header icon; **class-based dark mode** wired + persisted (`useTheme` in `App.tsx`), core surfaces carry `dark:` variants (full dark styling awaits a reference). New `SummaryBar` (dark totals strip) used on Records; record cards get a green left-accent + icon chip + icon-labelled fields. Logo uses `favicon.svg`.

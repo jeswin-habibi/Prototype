@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useData } from '../lib/useData'
 import { downloadTemplate, exportRows } from '../lib/excel'
 import { Banner, Empty, Section, Spinner } from './ui'
+import { IconDownload, IconUpload } from './icons'
 
 export type GridColType = 'text' | 'number' | 'boolean' | 'date' | 'select' | 'computed'
 
@@ -39,6 +40,7 @@ export interface DataGridProps {
   subtitle?: ReactNode
   collapsible?: boolean
   defaultOpen?: boolean
+  icon?: ReactNode
 }
 
 function coerce(type: GridColType, raw: string): unknown {
@@ -63,6 +65,7 @@ export default function DataGrid({
   subtitle,
   collapsible,
   defaultOpen,
+  icon,
 }: DataGridProps) {
   const { data, loading, error, refresh } = useData<Record<string, unknown>[]>(async () => {
     const { data, error } = await supabase.from(table).select('*').order(orderBy, { ascending })
@@ -128,43 +131,72 @@ export default function DataGrid({
   }
 
   const headers = templateHeaders ?? cols.filter((c) => c.type !== 'computed').map((c) => c.label)
+  const canExport = Boolean(exportColumns && data && data.length > 0)
+  const exportFile = () =>
+    exportRows(
+      (data ?? []).map((r) => Object.fromEntries(exportColumns!.map((c) => [c.header, r[c.field] ?? '']))),
+      `${fileBaseName}.xlsx`,
+    )
+
+  // Rich toolbar (icon badge, two-tone heading, 2x2 button grid) — opt-in via the `icon` prop.
+  const rich = Boolean(icon)
+  const [titleFirst, ...titleRest] = title.split(' ')
+  const titleNode = rich ? (
+    <span className="flex flex-col text-[15px] font-extrabold leading-tight">
+      <span className="text-brand-light">{titleFirst}</span>
+      {titleRest.length > 0 && <span className="text-slate-900 dark:text-white">{titleRest.join(' ')}</span>}
+    </span>
+  ) : (
+    title
+  )
+
+  const fileInput = onImport && (
+    <input
+      ref={fileRef}
+      type="file"
+      accept=".xlsx,.xls,.csv"
+      className="hidden"
+      onChange={(e) => e.target.files && onFile(e.target.files[0])}
+    />
+  )
+
+  const actionsEl = rich ? (
+    <div className="flex items-stretch border-l border-slate-200 pl-3 dark:border-ink-700">
+      <div className="grid grid-cols-2 gap-2">
+        {fileInput}
+        {onImport && (
+          <>
+            <ToolbarButton icon={<IconUpload className="h-4 w-4" />} label="Import" onClick={() => fileRef.current?.click()} disabled={busy} />
+            <ToolbarButton icon={<IconDownload className="h-4 w-4" />} label="Template" onClick={() => downloadTemplate(headers, `${fileBaseName}-template.xlsx`)} />
+          </>
+        )}
+        {canExport && <ToolbarButton icon={<IconDownload className="h-4 w-4" />} label="Export" onClick={exportFile} />}
+        <button className="btn-primary w-full justify-center text-sm" onClick={add} disabled={busy}>+ Add</button>
+      </div>
+    </div>
+  ) : (
+    <div className="flex flex-wrap gap-2">
+      {onImport && (
+        <>
+          {fileInput}
+          <button className="btn-secondary text-xs sm:text-sm" onClick={() => fileRef.current?.click()} disabled={busy}>⬆ Import</button>
+          <button className="btn-secondary text-xs sm:text-sm" onClick={() => downloadTemplate(headers, `${fileBaseName}-template.xlsx`)}>⬇ Template</button>
+        </>
+      )}
+      {canExport && (
+        <button className="btn-secondary text-xs sm:text-sm" onClick={exportFile}>⬇ Export</button>
+      )}
+      <button className="btn-primary text-xs sm:text-sm" onClick={add} disabled={busy}>+ Add</button>
+    </div>
+  )
 
   return (
     <Section
-      title={title}
+      title={titleNode}
+      icon={icon}
       collapsible={collapsible}
       defaultOpen={defaultOpen}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          {onImport && (
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={(e) => e.target.files && onFile(e.target.files[0])}
-              />
-              <button className="btn-secondary text-xs sm:text-sm" onClick={() => fileRef.current?.click()} disabled={busy}>⬆ Import</button>
-              <button className="btn-secondary text-xs sm:text-sm" onClick={() => downloadTemplate(headers, `${fileBaseName}-template.xlsx`)}>⬇ Template</button>
-            </>
-          )}
-          {exportColumns && data && data.length > 0 && (
-            <button
-              className="btn-secondary text-xs sm:text-sm"
-              onClick={() =>
-                exportRows(
-                  data.map((r) => Object.fromEntries(exportColumns.map((c) => [c.header, r[c.field] ?? '']))),
-                  `${fileBaseName}.xlsx`,
-                )
-              }
-            >
-              ⬇ Export
-            </button>
-          )}
-          <button className="btn-primary text-xs sm:text-sm" onClick={add} disabled={busy}>+ Add</button>
-        </div>
-      }
+      actions={actionsEl}
     >
       {subtitle && <p className="mb-3 text-sm text-slate-500">{subtitle}</p>}
       {error && <Banner tone="error">{error}</Banner>}
@@ -224,6 +256,30 @@ export default function DataGrid({
         </>
       )}
     </Section>
+  )
+}
+
+function ToolbarButton({
+  icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: ReactNode
+  label: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-soft transition hover:bg-slate-50 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50 dark:border-ink-700 dark:bg-ink-900 dark:text-slate-200 dark:hover:bg-ink-800"
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-brand-light">{icon}</span>
+      {label}
+    </button>
   )
 }
 

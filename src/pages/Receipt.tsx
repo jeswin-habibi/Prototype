@@ -2,6 +2,7 @@ import { parseParentWorkbook } from '../lib/excel'
 import { parentRow, parentTotalWeightG, type ParentCore } from '../lib/parent'
 import { formatWeight } from '../lib/units'
 import { PageHeader } from '../components/ui'
+import { IconBox } from '../components/icons'
 import DataGrid from '../components/DataGrid'
 
 export default function Receipt() {
@@ -14,6 +15,7 @@ export default function Receipt() {
 
       <DataGrid
         title="Received Parent Items"
+        icon={<IconBox className="h-5 w-5" />}
         subtitle="Qty = number of units/bags; Weight Per Unit × Qty = total available weight that jobs draw from."
         table="parent_items"
         orderBy="received_at"
