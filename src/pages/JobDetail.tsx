@@ -302,7 +302,7 @@ export default function JobDetail() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-200">
+                <tr className="border-b border-slate-200 dark:border-ink-700">
                   <th className="th">Parent ID</th>
                   <th className="th">Description</th>
                   <th className="th">Drawn weight</th>
@@ -312,7 +312,7 @@ export default function JobDetail() {
               </thead>
               <tbody>
                 {jobParents.map((jp) => (
-                  <tr key={jp.id} className="border-b border-slate-100">
+                  <tr key={jp.id} className="border-b border-slate-100 dark:border-ink-800">
                     <td className="td font-medium">{jp.parent?.item_code}</td>
                     <td className="td">{jp.parent?.description}</td>
                     <td className="td">{formatWeight(Number(jp.required_weight_g))}</td>
@@ -320,7 +320,7 @@ export default function JobDetail() {
                     <td className="td">{jp.parent?.expiry_date ?? '—'}</td>
                   </tr>
                 ))}
-                <tr className="bg-slate-50 font-semibold">
+                <tr className="bg-slate-50 font-semibold dark:bg-ink-900/50">
                   <td className="td">Total → {outProd}</td>
                   <td className="td" />
                   <td className="td">{formatWeight(inputWeightG)}</td>
@@ -378,7 +378,7 @@ export default function JobDetail() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-slate-200">
+                  <tr className="border-b border-slate-200 dark:border-ink-700">
                     <th className="th">Pack size</th>
                     <th className="th">Packs produced</th>
                     <th className="th">Output (g)</th>
@@ -387,7 +387,7 @@ export default function JobDetail() {
                 </thead>
                 <tbody>
                   {data.lines.map((l) => (
-                    <tr key={l.id} className="border-b border-slate-100">
+                    <tr key={l.id} className="border-b border-slate-100 dark:border-ink-800">
                       <td className="td font-medium">{Number(l.pack_size_g)}g</td>
                       <td className="td">
                         <input
@@ -403,7 +403,7 @@ export default function JobDetail() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-slate-50 font-semibold">
+                  <tr className="bg-slate-50 font-semibold dark:bg-ink-900/50">
                     <td className="td">Total output</td>
                     <td className="td">{num(totalPacks)} packs</td>
                     <td className="td">{num(result?.totalActualOutputG ?? 0)} g</td>
@@ -497,7 +497,7 @@ function WastageSection({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full max-w-md">
             <thead>
-              <tr className="border-b border-slate-200">
+              <tr className="border-b border-slate-200 dark:border-ink-700">
                 <th className="th">Reason</th>
                 <th className="th">Grams</th>
                 <th className="th" />
@@ -505,7 +505,7 @@ function WastageSection({
             </thead>
             <tbody>
               {wastage.map((w) => (
-                <tr key={w.id} className="border-b border-slate-100">
+                <tr key={w.id} className="border-b border-slate-100 dark:border-ink-800">
                   <td className="td">{w.reason}</td>
                   <td className="td">{num(Number(w.grams))}</td>
                   <td className="td text-right">
@@ -513,7 +513,7 @@ function WastageSection({
                   </td>
                 </tr>
               ))}
-              <tr className="bg-slate-50 font-semibold">
+              <tr className="bg-slate-50 font-semibold dark:bg-ink-900/50">
                 <td className="td">Total wastage</td>
                 <td className="td">{num(total)} g</td>
                 <td className="td" />
@@ -527,9 +527,9 @@ function WastageSection({
 }
 
 function Mini({ label, value, tone }: { label: string; value: string; tone?: 'good' | 'warn' | 'bad' }) {
-  const t = tone === 'good' ? 'text-emerald-600' : tone === 'warn' ? 'text-amber-600' : tone === 'bad' ? 'text-rose-600' : 'text-slate-900'
+  const t = tone === 'good' ? 'text-emerald-600 dark:text-emerald-400' : tone === 'warn' ? 'text-amber-600 dark:text-amber-400' : tone === 'bad' ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'
   return (
-    <div className="rounded-lg border border-slate-200/70 bg-white px-2.5 py-1.5">
+    <div className="rounded-lg border border-slate-200/70 bg-white px-2.5 py-1.5 dark:border-ink-700/70 dark:bg-ink-900">
       <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
       <div className={`text-sm font-bold leading-snug ${t}`}>{value}</div>
     </div>
@@ -572,7 +572,7 @@ function CostingSection({
       </div>
 
       <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="rounded-lg border border-slate-200 p-3 text-[13px]">
+        <div className="rounded-lg border border-slate-200 p-3 dark:border-ink-700 text-[13px]">
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Cost breakdown</h3>
           <Row label="Packaging" value={money(result.packagingCost)} />
           <Row label={manual ? 'Machine (manual → 0)' : `Machine (${machineHours.toFixed(1)}h × ${money(machineRate, 0)})`} value={money(result.machineCost)} />
@@ -580,17 +580,17 @@ function CostingSection({
           <Row label="Total repacking" value={money(result.totalRepackingCost)} bold />
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-slate-200 p-3">
+        <div className="overflow-x-auto rounded-lg border border-slate-200 p-3 dark:border-ink-700">
           <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Cost per pack</h3>
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-slate-200">
+              <tr className="border-b border-slate-200 dark:border-ink-700">
                 <th className="th !py-1.5">Size</th><th className="th !py-1.5">Packs</th><th className="th !py-1.5">Pkg</th><th className="th !py-1.5">Cost/pack</th>
               </tr>
             </thead>
             <tbody>
               {result.lines.map((l) => (
-                <tr key={l.packSizeG} className="border-b border-slate-100">
+                <tr key={l.packSizeG} className="border-b border-slate-100 dark:border-ink-800">
                   <td className="td !py-1.5 font-medium">{l.packSizeG}g</td>
                   <td className="td !py-1.5">{num(l.actualPacks)}</td>
                   <td className="td !py-1.5">{money(l.packagingPerUnit, 2)}</td>
@@ -607,9 +607,9 @@ function CostingSection({
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className={`flex justify-between py-0.5 ${bold ? 'mt-0.5 border-t border-slate-200 pt-1 font-semibold' : ''}`}>
-      <span className="text-slate-500">{label}</span>
-      <span>{value}</span>
+    <div className={`flex justify-between py-0.5 ${bold ? 'mt-0.5 border-t border-slate-200 pt-1 font-semibold dark:border-ink-700' : ''}`}>
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="dark:text-slate-100">{value}</span>
     </div>
   )
 }
