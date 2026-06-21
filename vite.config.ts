@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['logo.jpg'],
       manifest: {
-        name: 'Re-Pack IQ',
-        short_name: 'Re-Pack IQ',
+        name: 'Double 5 Analytics',
+        short_name: 'Double 5',
         description: 'Smart parent-to-child repacking, costing & insights',
         theme_color: '#0f766e',
         background_color: '#0f766e',

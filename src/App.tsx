@@ -144,7 +144,7 @@ function useTheme() {
 }
 
 function Logo({ className }: { className?: string }) {
-  return <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Re-Pack IQ" className={className} />
+  return <img src={`${import.meta.env.BASE_URL}logo.jpg`} alt="Double 5 Analytics" className={className} />
 }
 
 export default function App() {
@@ -163,7 +163,7 @@ function AppShell() {
       {/* Mobile top app bar — dark chrome */}
       <header className="sticky top-0 z-20 flex items-center gap-2.5 bg-ink-900 px-4 py-3 text-white md:hidden">
         <Logo className="h-8 w-8 rounded-lg" />
-        <div className="text-base font-bold">Re-Pack IQ</div>
+        <div className="text-base font-bold">Double 5 Analytics</div>
         <button
           onClick={toggleTheme}
           aria-label="Toggle dark mode"
@@ -179,7 +179,7 @@ function AppShell() {
           <div className="flex items-center gap-2.5 px-4 py-5">
             <Logo className="h-9 w-9 rounded-lg" />
             <div>
-              <div className="text-sm font-bold leading-tight">Re-Pack IQ</div>
+              <div className="text-sm font-bold leading-tight">Double 5 Analytics</div>
               <div className="text-xs text-slate-400">Smart repacking</div>
             </div>
           </div>

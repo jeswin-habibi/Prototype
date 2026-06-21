@@ -138,17 +138,8 @@ export default function DataGrid({
       `${fileBaseName}.xlsx`,
     )
 
-  // Rich toolbar (icon badge, two-tone heading, 2x2 button grid) — opt-in via the `icon` prop.
   const rich = Boolean(icon)
   const [titleFirst, ...titleRest] = title.split(' ')
-  const titleNode = rich ? (
-    <span className="flex flex-col text-[15px] font-extrabold leading-tight">
-      <span className="text-brand-light">{titleFirst}</span>
-      {titleRest.length > 0 && <span className="text-slate-900 dark:text-white">{titleRest.join(' ')}</span>}
-    </span>
-  ) : (
-    title
-  )
 
   const fileInput = onImport && (
     <input
@@ -160,21 +151,8 @@ export default function DataGrid({
     />
   )
 
-  const actionsEl = rich ? (
-    <div className="flex items-stretch border-l border-slate-200 pl-3 dark:border-ink-700">
-      <div className="grid grid-cols-2 gap-2">
-        {fileInput}
-        {onImport && (
-          <>
-            <ToolbarButton icon={<IconUpload className="h-4 w-4" />} label="Import" onClick={() => fileRef.current?.click()} disabled={busy} />
-            <ToolbarButton icon={<IconDownload className="h-4 w-4" />} label="Template" onClick={() => downloadTemplate(headers, `${fileBaseName}-template.xlsx`)} />
-          </>
-        )}
-        {canExport && <ToolbarButton icon={<IconDownload className="h-4 w-4" />} label="Export" onClick={exportFile} />}
-        <button className="btn-primary w-full justify-center text-sm" onClick={add} disabled={busy}>+ Add</button>
-      </div>
-    </div>
-  ) : (
+  // Default action row — used by the Config master grids (passed to <Section> on the right).
+  const plainActions = (
     <div className="flex flex-wrap gap-2">
       {onImport && (
         <>
@@ -190,14 +168,34 @@ export default function DataGrid({
     </div>
   )
 
-  return (
-    <Section
-      title={titleNode}
-      icon={icon}
-      collapsible={collapsible}
-      defaultOpen={defaultOpen}
-      actions={actionsEl}
-    >
+  // Rich toolbar (opt-in via `icon`): icon badge + two-tone heading, with a button grid that
+  // stacks below the heading on phones (2×2, full width) and sits beside it on sm+ screens —
+  // so the buttons always fit the viewport instead of overflowing off-screen.
+  const richToolbar = (
+    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+      <div className="flex items-center gap-2.5 sm:shrink-0">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand-light ring-1 ring-brand/25">{icon}</span>
+        <div className="text-[15px] font-extrabold uppercase leading-tight tracking-wide">
+          <div className="text-brand-light">{titleFirst}</div>
+          {titleRest.length > 0 && <div className="text-slate-900 dark:text-white">{titleRest.join(' ')}</div>}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-slate-200 dark:border-ink-700 sm:ml-auto sm:border-l sm:pl-4">
+        {fileInput}
+        {onImport && (
+          <>
+            <ToolbarButton icon={<IconUpload className="h-4 w-4" />} label="Import" onClick={() => fileRef.current?.click()} disabled={busy} />
+            <ToolbarButton icon={<IconDownload className="h-4 w-4" />} label="Template" onClick={() => downloadTemplate(headers, `${fileBaseName}-template.xlsx`)} />
+          </>
+        )}
+        {canExport && <ToolbarButton icon={<IconDownload className="h-4 w-4" />} label="Export" onClick={exportFile} />}
+        <button className="btn-primary w-full justify-center text-sm" onClick={add} disabled={busy}>+ Add</button>
+      </div>
+    </div>
+  )
+
+  const body = (
+    <>
       {subtitle && <p className="mb-3 text-sm text-slate-500">{subtitle}</p>}
       {error && <Banner tone="error">{error}</Banner>}
       {msg && <Banner tone="info">{msg}</Banner>}
@@ -255,6 +253,21 @@ export default function DataGrid({
           </div>
         </>
       )}
+    </>
+  )
+
+  if (rich) {
+    return (
+      <section className="card mb-4">
+        {richToolbar}
+        {body}
+      </section>
+    )
+  }
+
+  return (
+    <Section title={title} collapsible={collapsible} defaultOpen={defaultOpen} actions={plainActions}>
+      {body}
     </Section>
   )
 }

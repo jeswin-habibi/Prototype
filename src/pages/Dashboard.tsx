@@ -323,8 +323,8 @@ const PIPE_BG = {
 function Pipe({ label, n, accent, Icon }: { label: string; n: number; accent: keyof typeof PIPE_TEXT; Icon: ComponentType<{ className?: string }> }) {
   return (
     <div className={`relative overflow-hidden rounded-xl p-2.5 ${PIPE_BG[accent]}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-      <div className={`text-xl font-extrabold ${PIPE_TEXT[accent]}`}>{num(n)}</div>
+      <div className="min-h-[1.7rem] text-[10px] font-semibold uppercase leading-tight tracking-wide text-slate-400">{label}</div>
+      <div className={`text-xl font-extrabold leading-none ${PIPE_TEXT[accent]}`}>{num(n)}</div>
       <Icon className={`absolute bottom-2 right-2 h-4 w-4 opacity-50 ${PIPE_TEXT[accent]}`} />
     </div>
   )
