@@ -7,6 +7,7 @@ import { dateTime, dateOnly } from '../lib/format'
 import { formatWeight } from '../lib/units'
 import type { Employee, Machine, ParentChildMap, ParentItem, ProcessType, RepackJob } from '../types'
 import { Banner, Empty, PageHeader, Section, Spinner, StatusBadge } from '../components/ui'
+import { IconTrash } from '../components/icons'
 
 // Days from today until a YYYY-MM-DD date (negative = already expired).
 function daysUntil(d: string | null): number | null {
@@ -82,12 +83,12 @@ export default function Jobs() {
         subtitle="Create a job: pick Machine or Manual, draw weight from one or more parents, then run it."
         actions={
           <button className="btn-primary" onClick={() => setCreating((v) => !v)}>
-            {creating ? 'Close' : '+ Create Job'}
+            {creating ? '← All Jobs' : '+ Create Job'}
           </button>
         }
       />
 
-      {creating && (
+      {creating ? (
         <CreateJob
           refData={refData.data}
           onCreated={(id) => {
@@ -97,8 +98,7 @@ export default function Jobs() {
             navigate(`/jobs/${id}`)
           }}
         />
-      )}
-
+      ) : (
       <Section title="All Jobs">
         {jobs.loading ? (
           <Spinner />
@@ -167,6 +167,7 @@ export default function Jobs() {
           </>
         )}
       </Section>
+      )}
     </div>
   )
 }
@@ -342,14 +343,25 @@ function CreateJob({ refData, onCreated }: { refData: RefData | null; onCreated:
           <span className="text-slate-400">{open ? '▴' : '▾'}</span>
         </button>
 
-        {/* selected chips */}
+        {/* selected parents — each row has a tiny trash button on the right to remove it */}
         {selectedEntries.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 space-y-1.5">
             {selectedEntries.map(([pid, w]) => (
-              <span key={pid} className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700 dark:bg-brand/15 dark:text-brand-light">
-                <button type="button" className="font-medium" onClick={() => editQty(parentsById[pid])}>{parentsById[pid]?.item_code}: {w} kg</button>
-                <button type="button" className="text-brand-700/60 hover:text-rose-600" onClick={() => removeSelected(pid)} aria-label="Remove">✕</button>
-              </span>
+              <div key={pid} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 dark:border-ink-700 dark:bg-ink-800">
+                <button type="button" className="min-w-0 flex-1 text-left text-sm" onClick={() => editQty(parentsById[pid])}>
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">{parentsById[pid]?.item_code}</span>
+                  <span className="text-slate-400"> · </span>
+                  <span className="font-medium text-brand dark:text-brand-light">{w} kg</span>
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 rounded-md p-1 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10"
+                  onClick={() => removeSelected(pid)}
+                  aria-label={`Remove ${parentsById[pid]?.item_code}`}
+                >
+                  <IconTrash className="h-4 w-4" />
+                </button>
+              </div>
             ))}
           </div>
         )}

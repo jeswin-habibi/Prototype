@@ -333,6 +333,7 @@ function Cell({
       type={col.type === 'number' ? 'number' : col.type === 'date' ? 'date' : 'text'}
       defaultValue={raw == null ? '' : col.type === 'date' ? String(raw).slice(0, 10) : String(raw)}
       onBlur={(e) => onSave(coerce(col.type, e.target.value))}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
     />
   )
 }

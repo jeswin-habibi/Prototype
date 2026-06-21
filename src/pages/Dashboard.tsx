@@ -136,11 +136,11 @@ export default function Dashboard() {
       <div className="mb-4 flex max-w-md items-end gap-2">
         <div className="min-w-0 flex-1">
           <label className="label">From</label>
-          <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <input className="input" type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
         </div>
         <div className="min-w-0 flex-1">
           <label className="label">To</label>
-          <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <input className="input" type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
         </div>
         <button className="btn-secondary shrink-0" onClick={resetRange} disabled={!data}>
           Reset
@@ -168,7 +168,7 @@ export default function Dashboard() {
             <div className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-200">
               <span className="h-3.5 w-1.5 rounded-full bg-gradient-to-b from-brand-light to-brand" /> Job Pipeline
             </div>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Pipe label="Created" n={m.statusCounts.Created + m.statusCounts.Processing + m.statusCounts['On Hold'] + m.statusCounts.Completed} accent="slate" Icon={IconRecords} />
               <Pipe label="Processing" n={m.statusCounts.Processing} accent="amber" Icon={IconGear} />
               <Pipe label="On Hold" n={m.statusCounts['On Hold']} accent="rose" Icon={IconPause} />
