@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['logo.jpg'],
       manifest: {
-        name: 'Double 5 Analytics',
-        short_name: 'Double 5',
+        name: 'Repack Pro',
+        short_name: 'Repack Pro',
         description: 'Smart parent-to-child repacking, costing & insights',
         theme_color: '#0f766e',
         background_color: '#0f766e',

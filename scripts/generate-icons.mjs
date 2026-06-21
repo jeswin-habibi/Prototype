@@ -1,4 +1,4 @@
-// Generates the Double 5 Analytics PWA icons (teal gradient tile + 3-D package + sparkle).
+// Generates the Repack Pro PWA icons (teal gradient tile + 3-D package + sparkle).
 // Pure Node, no native deps — renders per-pixel with 3× supersampling for smooth edges.
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
