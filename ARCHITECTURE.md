@@ -62,7 +62,7 @@ src/
   types.ts                     DB row types (mirror schema.sql)
   index.css                    Tailwind + .btn/.card/.input/.th/.td component classes
   components/ui.tsx            PageHeader, Section, Stat, StatusBadge, Empty, Spinner, Banner
-  components/DataGrid.tsx      Reusable inline-edit grid: CRUD + Import/Template/Export (+deriveRow; opt-in rich toolbar via `icon`)
+  components/DataGrid.tsx      Reusable inline-edit grid: CRUD + Import/Template/Export (+deriveRow, buildAddRow for auto-codes; opt-in rich toolbar via `icon`)
   lib/
     supabase.ts                Client + isSupabaseConfigured flag
     useData.ts                 useData(loader, deps) → {data, loading, error, refresh}
@@ -214,6 +214,7 @@ set; moving it into a Postgres RPC / materialized view is the Phase 5 scale step
 ## 10. Iteration Log
 Append one line per change set. Newest first.
 
+- **2026-06-21** — **Config masters auto-code (+ fixes insert errors)**: "+ Add" on the masters was inserting a **static default** (`EMP000`, `grams 500`, `pack_size_g 500`, `Machine 5`, `New Reason`) that collided with the table's **UNIQUE** column on the 2nd add (or against the seed) → insert error. New `DataGrid` prop **`buildAddRow(rows)`** builds the inserted row from current rows; Config now **auto-increments** each master's unique value (Employee `EMP004…`, Machine `Machine 5…`, Pack Size grams `+50`, Packaging Cost `pack_size_g +50`, Wastage Reason `New Reason 2…`) so adds always succeed and codes are sensible. (Parent-Child Master stays manual/import-driven.)
 - **2026-06-21** — **Dashboard/Jobs UX + input fixes**: Dashboard date filter now constrains the range (**To can't precede From** via `min`/`max`); **Job Pipeline** tiles go **2-up on mobile** (4-up `sm+`) so labels fit one line and numbers align. Jobs page: **Create Job hides the list** (you see only the form until "← All Jobs"); selected parents render as a tidy row with a **small trash button** on the right (was wrap-chips with ✕). DataGrid: pressing **Enter / mobile "Go" commits the field** (blurs to save) instead of needing a tap-away.
 - **2026-06-21** — **Rename → Repack Pro**: app renamed Double 5 Analytics → **Repack Pro** across header/sidebar, `index.html` title + iOS title, and PWA manifest `name`/`short_name` (both "Repack Pro"). Logo image/PWA icon art unchanged.
 - **2026-06-21** — **Rebrand + mobile fixes**: app renamed **Re-Pack IQ → Double 5 Analytics** (header/sidebar, `index.html` title + iOS title, PWA manifest `name`; manifest `short_name` = "Double 5"). **DataGrid rich toolbar made responsive** — the button grid was overflowing off-screen on phones; it now **stacks below the heading on mobile** (2×2, full-width) and sits beside it (with the divider) only on `sm+`; the toolbar renders in its own card rather than `Section`'s fixed horizontal header. Dashboard **Job Pipeline tiles**: reserved a 2-line label height so long labels (Processing/Completed) no longer push their numbers out of alignment.

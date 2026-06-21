@@ -4,6 +4,38 @@ import { parseParentChildMap } from '../lib/excel'
 import { Empty, PageHeader, Section, Spinner } from '../components/ui'
 import DataGrid from '../components/DataGrid'
 
+// ── Auto-generate unique values for new master rows (prevents unique-constraint errors on "+ Add") ──
+/** Next sequential code from existing rows, e.g. EMP001 → EMP004, "Machine 4" → "Machine 5". */
+function nextCode(rows: Record<string, unknown>[], field: string, prefix: string, pad = 0): string {
+  let max = 0
+  for (const r of rows) {
+    const v = String(r[field] ?? '')
+    if (v.startsWith(prefix)) {
+      const n = parseInt(v.slice(prefix.length), 10)
+      if (Number.isFinite(n) && n > max) max = n
+    }
+  }
+  const n = max + 1
+  return prefix + (pad ? String(n).padStart(pad, '0') : String(n))
+}
+/** Next unused numeric value (max + step) for unique numeric columns like pack-size grams. */
+function nextNumber(rows: Record<string, unknown>[], field: string, step: number): number {
+  let max = 0
+  for (const r of rows) {
+    const n = Number(r[field])
+    if (Number.isFinite(n) && n > max) max = n
+  }
+  return max + step
+}
+/** Next unused name, e.g. "New Reason", "New Reason 2", … */
+function nextName(rows: Record<string, unknown>[], field: string, base: string): string {
+  const used = new Set(rows.map((r) => String(r[field] ?? '')))
+  if (!used.has(base)) return base
+  let i = 2
+  while (used.has(`${base} ${i}`)) i++
+  return `${base} ${i}`
+}
+
 function CostingConfigEditor() {
   const { data, loading, refresh } = useData<{ id: string; machine_cost_per_hour: number; labor_cost_per_hour: number } | null>(
     async () => {
@@ -110,6 +142,7 @@ export default function Config() {
           { field: 'active', label: 'Active', type: 'boolean' },
         ]}
         defaultRow={{ code: 'EMP000', name: 'New Operator', active: true }}
+        buildAddRow={(rows) => ({ code: nextCode(rows, 'code', 'EMP', 3), name: 'New Operator', active: true })}
       />
 
       <DataGrid
@@ -125,6 +158,7 @@ export default function Config() {
           { field: 'active', label: 'Active', type: 'boolean' },
         ]}
         defaultRow={{ code: 'Machine 5', name: 'Machine 5', active: true }}
+        buildAddRow={(rows) => { const code = nextCode(rows, 'code', 'Machine ', 0); return { code, name: code, active: true } }}
       />
 
       <DataGrid
@@ -139,6 +173,7 @@ export default function Config() {
           { field: 'active', label: 'Active', type: 'boolean' },
         ]}
         defaultRow={{ grams: 500, label: '500g', active: true }}
+        buildAddRow={(rows) => { const grams = nextNumber(rows, 'grams', 50); return { grams, label: `${grams}g`, active: true } }}
       />
 
       <DataGrid
@@ -152,6 +187,7 @@ export default function Config() {
           { field: 'active', label: 'Active', type: 'boolean' },
         ]}
         defaultRow={{ name: 'New Reason', active: true }}
+        buildAddRow={(rows) => ({ name: nextName(rows, 'name', 'New Reason'), active: true })}
       />
 
       <DataGrid
@@ -165,6 +201,7 @@ export default function Config() {
           { field: 'cost_per_unit', label: 'Cost / unit', type: 'number' },
         ]}
         defaultRow={{ pack_size_g: 500, cost_per_unit: 0 }}
+        buildAddRow={(rows) => ({ pack_size_g: nextNumber(rows, 'pack_size_g', 50), cost_per_unit: 0 })}
       />
 
       <CostingConfigEditor />

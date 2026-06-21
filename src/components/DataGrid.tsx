@@ -26,6 +26,8 @@ export interface DataGridProps {
   orderBy: string
   ascending?: boolean
   defaultRow: Record<string, unknown>
+  /** build the row inserted on "+ Add"; receives the current rows so codes can auto-increment. Falls back to defaultRow. */
+  buildAddRow?: (rows: Record<string, unknown>[]) => Record<string, unknown>
   /** transform a row before insert/update (e.g. derive mirror/computed columns) */
   deriveRow?: (row: Record<string, unknown>) => Record<string, unknown>
   /** parse an uploaded file into rows ready to persist (already derived) */
@@ -56,6 +58,7 @@ export default function DataGrid({
   orderBy,
   ascending = true,
   defaultRow,
+  buildAddRow,
   deriveRow,
   onImport,
   importConflict,
@@ -89,7 +92,8 @@ export default function DataGrid({
 
   async function add() {
     setBusy(true)
-    const payload = deriveRow ? deriveRow({ ...defaultRow }) : defaultRow
+    const base = buildAddRow ? buildAddRow(data ?? []) : { ...defaultRow }
+    const payload = deriveRow ? deriveRow(base) : base
     const { error } = await supabase.from(table).insert(payload)
     setBusy(false)
     if (error) setMsg(error.message)
