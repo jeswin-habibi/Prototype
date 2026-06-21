@@ -309,13 +309,13 @@ function compact(n: number): string {
 }
 
 const PIPE_TEXT = {
-  slate: 'text-slate-900 dark:text-white',
+  slate: 'text-sky-600 dark:text-sky-400',
   amber: 'text-amber-600 dark:text-amber-400',
   rose: 'text-rose-600 dark:text-rose-400',
   emerald: 'text-emerald-600 dark:text-emerald-400',
 }
 const PIPE_BG = {
-  slate: 'bg-white/70 dark:bg-ink-900/40',
+  slate: 'bg-sky-500/10 ring-1 ring-inset ring-sky-500/20',
   amber: 'bg-amber-500/10 ring-1 ring-inset ring-amber-500/20',
   rose: 'bg-rose-500/10 ring-1 ring-inset ring-rose-500/20',
   emerald: 'bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/25',
